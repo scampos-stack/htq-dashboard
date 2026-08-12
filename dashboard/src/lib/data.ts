@@ -22,6 +22,122 @@ export type CampaignWithStats = {
   } | null;
 };
 
+export type RangeStats = { sent: number; delivered: number; opened: number };
+
+export async function getDailyRangeTotals(
+  days: number
+): Promise<Map<number, RangeStats>> {
+  const supabase = supabaseServer();
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceStr = since.toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("campaign_stats_daily")
+    .select("campaign_id, sent, delivered, opened")
+    .gte("sent_date", sinceStr);
+  if (error) throw error;
+
+  const totals = new Map<number, RangeStats>();
+  for (const row of data ?? []) {
+    const existing = totals.get(row.campaign_id) ?? {
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+    };
+    existing.sent += row.sent;
+    existing.delivered += row.delivered;
+    existing.opened += row.opened;
+    totals.set(row.campaign_id, existing);
+  }
+  return totals;
+}
+
+export type SourceSummaryRow = {
+  key: string;
+  label: string;
+  connected: boolean;
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+};
+
+export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
+  const supabase = supabaseServer();
+
+  const { data: campaigns, error: campaignsErr } = await supabase
+    .from("campaigns")
+    .select("id, source");
+  if (campaignsErr) throw campaignsErr;
+
+  const { data: snapshots, error: snapshotsErr } = await supabase
+    .from("campaign_stats_snapshot")
+    .select("campaign_id, sent, delivered, opened, clicked, pulled_at")
+    .order("pulled_at", { ascending: false });
+  if (snapshotsErr) throw snapshotsErr;
+
+  const sourceByCampaign = new Map(
+    (campaigns ?? []).map((c) => [c.id, c.source])
+  );
+  const latestByCampaign = new Map<number, (typeof snapshots)[number]>();
+  for (const row of snapshots ?? []) {
+    if (!latestByCampaign.has(row.campaign_id)) {
+      latestByCampaign.set(row.campaign_id, row);
+    }
+  }
+
+  const woodpecker: SourceSummaryRow = {
+    key: "woodpecker",
+    label: "Woodpecker (cold email)",
+    connected: true,
+    sent: 0,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+  };
+  for (const [campaignId, s] of latestByCampaign) {
+    if (sourceByCampaign.get(campaignId) === "woodpecker") {
+      woodpecker.sent += s.sent;
+      woodpecker.delivered += s.delivered;
+      woodpecker.opened += s.opened;
+      woodpecker.clicked += s.clicked;
+    }
+  }
+
+  const placeholders: SourceSummaryRow[] = [
+    {
+      key: "keap_broadcast",
+      label: "Keap Broadcasts",
+      connected: false,
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+      clicked: 0,
+    },
+    {
+      key: "keap_automation_lead_marketing",
+      label: "Keap Automations — Lead Marketing",
+      connected: false,
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+      clicked: 0,
+    },
+    {
+      key: "keap_automation_customer_comms",
+      label: "Keap Automations — Customer/Comms",
+      connected: false,
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+      clicked: 0,
+    },
+  ];
+
+  return [woodpecker, ...placeholders];
+}
+
 export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
   const supabase = supabaseServer();
 
