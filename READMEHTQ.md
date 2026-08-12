@@ -23,6 +23,10 @@ Woodpecker at minimum.
 
 Extracted color/type/logo/UI reference: [`branding.md`](branding.md).
 
+## Dashboard
+
+Live at Vercel, `dashboard/` subfolder, connected to Supabase for data. Ingestion via `scripts/` (sample CSV import + live Woodpecker API pull).
+
 ## Open questions
 
 - [ ] Exact per-source metrics to surface (e.g. Zendesk: ticket volume vs. specific tags; JustCall:
