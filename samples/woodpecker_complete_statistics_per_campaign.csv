@@ -1,0 +1,7 @@
+client,campaign_owner,campaign_id,campaign,campaign_status,step,version,sent,bounced,bounce_rate,opened,opened_rate,clicked,opt_out,opt_out_rate,delivered,responded,responded_rate,interested_yes,interested_maybe,interested_no
+Hometown Quotes,"Andrew ",1589950,Independent Nurture 6/8/26,RUNNING,1,A,99,5,5.1,19,20.2,0,0,0.0,94,1,1.1,0,1,0
+Hometown Quotes,"Andrew ",1589950,Independent Nurture 6/8/26,RUNNING,2,A,54,0,0.0,17,31.5,0,0,0.0,54,0,0.0,0,0,0
+Hometown Quotes,"Andrew ",1589952,Farmers Nurture 6/8/26,RUNNING,1,A,98,0,0.0,12,12.2,0,0,0.0,98,0,0.0,0,0,0
+Hometown Quotes,"Andrew ",1589952,Farmers Nurture 6/8/26,RUNNING,2,A,38,0,0.0,31,81.6,0,0,0.0,38,0,0.0,0,0,0
+Hometown Quotes,"Andrew ",1589953,State Farm Nurture 6/8/26,RUNNING,1,A,99,1,1.0,1,1.0,0,0,0.0,98,0,0.0,0,0,0
+Hometown Quotes,"Andrew ",1589953,State Farm Nurture 6/8/26,RUNNING,2,A,39,0,0.0,0,0.0,0,0,0.0,39,0,0.0,0,0,0
