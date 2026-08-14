@@ -10,6 +10,7 @@ import { RangeSelect } from "@/components/RangeSelect";
 import { SourceNav } from "@/components/SourceNav";
 import { StatusFilter } from "@/components/StatusFilter";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { CarrierEditor } from "@/components/CarrierEditor";
 
 function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING" || status === "PUBLISHED";
@@ -211,6 +212,7 @@ function KeapAutomationsList({
                 <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
                   <th className="py-2 pr-4">Automation</th>
                   <th className="py-2 pr-4">Has Email</th>
+                  <th className="py-2 pr-4">Carrier</th>
                   <th className="py-2 pr-4">Active Contacts</th>
                   <th className="py-2 pr-4">Completed Contacts</th>
                 </tr>
@@ -221,6 +223,9 @@ function KeapAutomationsList({
                     <td className="py-3 pr-4 font-semibold text-charcoal">{a.name}</td>
                     <td className="py-3 pr-4">
                       <StatusPill status={a.status} />
+                    </td>
+                    <td className="py-3 pr-4">
+                      <CarrierEditor campaignId={a.id} carrier={a.carrier} />
                     </td>
                     <td className="py-3 pr-4">{a.activeContacts.toLocaleString()}</td>
                     <td className="py-3 pr-4">{a.completedContacts.toLocaleString()}</td>
@@ -390,11 +395,14 @@ export default async function Home({
                         key={c.id}
                         className="rounded-3xl border-l-4 border-brand-green bg-white p-6 shadow-sm"
                       >
-                        <div className="mb-4 flex items-start justify-between gap-3">
+                        <div className="mb-2 flex items-start justify-between gap-3">
                           <h3 className="font-heading text-lg font-semibold text-charcoal">
                             {c.name}
                           </h3>
                           <StatusPill status={c.status} />
+                        </div>
+                        <div className="mb-4">
+                          <CarrierEditor campaignId={c.id} carrier={c.carrier} />
                         </div>
 
                         <div className="grid grid-cols-3 gap-4">

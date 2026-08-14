@@ -6,6 +6,7 @@ export type CampaignWithStats = {
   name: string;
   owner: string | null;
   status: string | null;
+  carrier: string | null;
   stats: {
     sent: number;
     delivered: number;
@@ -241,6 +242,7 @@ export type KeapAutomation = {
   name: string;
   status: string | null;
   category: string;
+  carrier: string | null;
   activeContacts: number;
   completedContacts: number;
 };
@@ -250,7 +252,7 @@ export async function getKeapAutomations(): Promise<KeapAutomation[]> {
 
   const { data: campaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, name, status, category")
+    .select("id, name, status, category, carrier")
     .eq("source", "keap")
     .neq("category", "email_aggregate")
     .order("name");
@@ -277,6 +279,7 @@ export async function getKeapAutomations(): Promise<KeapAutomation[]> {
       name: c.name,
       status: c.status,
       category: c.category ?? "uncategorized",
+      carrier: c.carrier,
       activeContacts: s?.active_contacts ?? 0,
       completedContacts: s?.completed_contacts ?? 0,
     };
@@ -288,7 +291,7 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
 
   const { data: campaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, source, name, owner, status")
+    .select("id, source, name, owner, status, carrier")
     .eq("source", "woodpecker")
     .order("name");
   if (campaignsErr) throw campaignsErr;
