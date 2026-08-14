@@ -10,6 +10,7 @@ create table if not exists campaigns (
   owner        text,
   status       text,                       -- e.g. RUNNING, PAUSED, COMPLETED
   category     text,                       -- e.g. 'nurture' vs 'lead_gen' for Keap automations
+  carrier      text,                       -- e.g. 'Independent', 'Farmers', 'State Farm'
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   unique (source, external_id)
@@ -62,3 +63,11 @@ create table if not exists campaign_stats_daily (
 
 create index if not exists idx_campaign_stats_daily_date on campaign_stats_daily (sent_date);
 create index if not exists idx_campaigns_source on campaigns (source);
+
+-- Manual annotations on a sending domain's health status (e.g. explaining a
+-- known/expected bounce spike). Freeform, user-editable from the dashboard.
+create table if not exists domain_notes (
+  domain     text primary key,
+  note       text not null,
+  updated_at timestamptz not null default now()
+);

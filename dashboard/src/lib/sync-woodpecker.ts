@@ -1,4 +1,5 @@
 import { supabaseServer } from "./supabase-server";
+import { classifyCarrier } from "./classify-carrier";
 
 const API_BASE = "https://api.woodpecker.co/rest/v1";
 
@@ -52,6 +53,7 @@ export async function syncWoodpecker(): Promise<{
     name: c.name,
     owner: c.from_name || null,
     status: c.status || null,
+    carrier: classifyCarrier(c.name),
   }));
 
   const { data: upsertedCampaigns, error: campaignErr } = await supabase

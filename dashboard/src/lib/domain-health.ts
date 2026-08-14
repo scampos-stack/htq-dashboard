@@ -10,6 +10,7 @@ export type DomainTotals = {
   sent: number;
   delivered: number;
   bounceRate: number | null;
+  note: string | null;
 };
 
 export type DomainHealthOverview = {
@@ -60,12 +61,19 @@ export async function getDomainHealthOverview(): Promise<DomainHealthOverview> {
     totalDelivered += row.delivered;
   }
 
+  const { data: notesData, error: notesErr } = await supabase
+    .from("domain_notes")
+    .select("domain, note");
+  if (notesErr) throw notesErr;
+  const noteByDomain = new Map((notesData ?? []).map((n) => [n.domain, n.note]));
+
   const domains: DomainTotals[] = [...byDomain.entries()]
     .map(([domain, t]) => ({
       domain,
       sent: t.sent,
       delivered: t.delivered,
       bounceRate: t.sent ? ((t.sent - t.delivered) / t.sent) * 100 : null,
+      note: noteByDomain.get(domain) ?? null,
     }))
     .sort((a, b) => b.sent - a.sent);
 

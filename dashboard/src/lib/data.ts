@@ -63,6 +63,58 @@ export type SourceSummaryRow = {
   clicked: number;
 };
 
+export type CarrierSummaryRow = {
+  carrier: string;
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+};
+
+export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
+  const supabase = supabaseServer();
+
+  const { data: campaigns, error: campaignsErr } = await supabase
+    .from("campaigns")
+    .select("id, carrier, category")
+    .neq("category", "email_aggregate");
+  if (campaignsErr) throw campaignsErr;
+  if (!campaigns?.length) return [];
+
+  const { data: snapshots, error: snapshotsErr } = await supabase
+    .from("campaign_stats_snapshot")
+    .select("campaign_id, sent, delivered, opened, clicked, pulled_at")
+    .order("pulled_at", { ascending: false });
+  if (snapshotsErr) throw snapshotsErr;
+
+  const latestByCampaign = new Map<number, (typeof snapshots)[number]>();
+  for (const row of snapshots ?? []) {
+    if (!latestByCampaign.has(row.campaign_id)) {
+      latestByCampaign.set(row.campaign_id, row);
+    }
+  }
+
+  const byCarrier = new Map<string, CarrierSummaryRow>();
+  for (const c of campaigns) {
+    const carrier = c.carrier ?? "General";
+    const row = byCarrier.get(carrier) ?? {
+      carrier,
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+      clicked: 0,
+    };
+    const s = latestByCampaign.get(c.id);
+    row.sent += s?.sent ?? 0;
+    row.delivered += s?.delivered ?? 0;
+    row.opened += s?.opened ?? 0;
+    row.clicked += s?.clicked ?? 0;
+    byCarrier.set(carrier, row);
+  }
+
+  return [...byCarrier.values()].sort((a, b) => b.sent - a.sent);
+}
+
 export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
   const supabase = supabaseServer();
 

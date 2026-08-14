@@ -3,8 +3,8 @@ import {
   getDomainHealthTrend,
 } from "@/lib/domain-health";
 import { BounceRateChart } from "@/components/BounceRateChart";
-import { TopTabs } from "@/components/TopTabs";
-import { SyncButton } from "@/components/SyncButton";
+import { DomainNoteEditor } from "@/components/DomainNoteEditor";
+import { DashboardHeader } from "@/components/DashboardHeader";
 
 const STATUS = {
   good: { color: "#0ca30c", label: "Good" },
@@ -70,6 +70,7 @@ function DomainTable({
             <th className="py-2 pr-4">Delivered</th>
             <th className="py-2 pr-4">Bounce Rate</th>
             <th className="py-2 pr-4">Status</th>
+            <th className="py-2 pr-4">Note</th>
           </tr>
         </thead>
         <tbody>
@@ -95,6 +96,9 @@ function DomainTable({
                     {STATUS[status].label}
                   </span>
                 </td>
+                <td className="py-3 pr-4">
+                  <DomainNoteEditor domain={d.domain} initialNote={d.note} />
+                </td>
               </tr>
             );
           })}
@@ -118,21 +122,7 @@ export default async function DomainHealthPage() {
 
   return (
     <div className="flex-1 bg-mist">
-      <header className="flex items-start justify-between gap-4 border-b border-black/5 bg-white px-6 py-6 sm:px-10">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-body-gray">
-            Marketing Dashboard
-          </p>
-          <h1 className="font-heading text-3xl font-bold">
-            <span className="text-brand-green">HOMETOWN</span>
-            <span className="text-charcoal">QUOTES</span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <TopTabs active="domain-health" />
-          <SyncButton />
-        </div>
-      </header>
+      <DashboardHeader active="domain-health" />
 
       <main className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
         <h2 className="mb-2 font-heading text-xl font-semibold text-charcoal">

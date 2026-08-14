@@ -1,4 +1,5 @@
 import { supabaseServer } from "./supabase-server";
+import { classifyCarrier } from "./classify-carrier";
 
 const API_BASE = "https://api.infusionsoft.com/crm/rest/v1";
 
@@ -61,6 +62,7 @@ export async function syncKeap(): Promise<{
     name: c.name,
     status: c.published_status ? "PUBLISHED" : "UNPUBLISHED",
     category: classify(c.name),
+    carrier: classifyCarrier(c.name),
   }));
 
   const { data: upserted, error: campaignErr } = await supabase
