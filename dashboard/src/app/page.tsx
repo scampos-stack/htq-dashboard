@@ -3,14 +3,14 @@ import {
   getCampaignsWithStats,
   getDailyRangeTotals,
   getSourceSummary,
-  getKeapAutomationsSummary,
+  getKeapAutomations,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
 import { SyncButton } from "@/components/SyncButton";
 import { SourceNav } from "@/components/SourceNav";
 
 function StatusPill({ status }: { status: string | null }) {
-  const isRunning = status === "RUNNING";
+  const isRunning = status === "RUNNING" || status === "PUBLISHED";
   return (
     <span
       className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
@@ -126,12 +126,18 @@ function SourceSummaryTable({
   );
 }
 
-function KeapAutomationsTable({
-  rows,
+const CATEGORY_LABELS: Record<string, string> = {
+  automation_lead_marketing: "Lead Marketing",
+  automation_customer_comms: "Customer / Comms",
+  uncategorized: "Uncategorized",
+};
+
+function KeapAutomationsList({
+  automations,
 }: {
-  rows: Awaited<ReturnType<typeof getKeapAutomationsSummary>>;
+  automations: Awaited<ReturnType<typeof getKeapAutomations>>;
 }) {
-  if (rows.length === 0) {
+  if (automations.length === 0) {
     return (
       <div className="rounded-3xl bg-white p-6 text-sm text-body-gray shadow-sm">
         No Keap automations synced yet — click &quot;Sync Now&quot; above.
@@ -139,32 +145,52 @@ function KeapAutomationsTable({
     );
   }
 
+  const byCategory = new Map<string, typeof automations>();
+  for (const a of automations) {
+    const list = byCategory.get(a.category) ?? [];
+    list.push(a);
+    byCategory.set(a.category, list);
+  }
+
   return (
-    <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-      <table className="w-full min-w-[480px] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-            <th className="py-2 pr-4">Category</th>
-            <th className="py-2 pr-4">Automations</th>
-            <th className="py-2 pr-4">Active Contacts</th>
-            <th className="py-2 pr-4">Completed Contacts</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.category} className="border-b border-black/5">
-              <td className="py-3 pr-4 font-semibold text-charcoal">{r.label}</td>
-              <td className="py-3 pr-4">{r.automationCount}</td>
-              <td className="py-3 pr-4">{r.activeContacts.toLocaleString()}</td>
-              <td className="py-3 pr-4">{r.completedContacts.toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="mt-4 text-xs text-body-gray">
+    <div className="space-y-6">
+      {[...byCategory.entries()].map(([category, list]) => (
+        <div key={category} className="rounded-3xl bg-white p-6 shadow-sm">
+          <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+            {CATEGORY_LABELS[category] ?? category}{" "}
+            <span className="font-normal text-body-gray">({list.length})</span>
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+                  <th className="py-2 pr-4">Automation</th>
+                  <th className="py-2 pr-4">Has Email</th>
+                  <th className="py-2 pr-4">Active Contacts</th>
+                  <th className="py-2 pr-4">Completed Contacts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((a) => (
+                  <tr key={a.id} className="border-b border-black/5">
+                    <td className="py-3 pr-4 font-semibold text-charcoal">{a.name}</td>
+                    <td className="py-3 pr-4">
+                      <StatusPill status={a.status} />
+                    </td>
+                    <td className="py-3 pr-4">{a.activeContacts.toLocaleString()}</td>
+                    <td className="py-3 pr-4">{a.completedContacts.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+      <p className="text-xs text-body-gray">
         Category is a first-pass keyword guess (no native field from Keap) —
-        review and correct as needed. Keap&apos;s API doesn&apos;t expose
-        per-email open/click stats for automations, only contact-flow volume.
+        review and correct as needed. &quot;Has Email&quot; reflects whether the
+        automation is published (actively sending), not per-email open/click
+        stats — Keap&apos;s API doesn&apos;t expose those for automations.
       </p>
     </div>
   );
@@ -187,10 +213,10 @@ export default async function Home({
   const sourceParam =
     typeof params.source === "string" ? params.source : "all";
 
-  const [campaigns, sourceSummary, keapSummary, rangeTotals] = await Promise.all([
+  const [campaigns, sourceSummary, keapAutomations, rangeTotals] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
-    getKeapAutomationsSummary(),
+    getKeapAutomations(),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
   ]);
 
@@ -233,7 +259,7 @@ export default async function Home({
 
           {showKeapAutomations && (
             <SectionBlock title="Keap Automations" accent="border-amber-500">
-              <KeapAutomationsTable rows={keapSummary} />
+              <KeapAutomationsList automations={keapAutomations} />
             </SectionBlock>
           )}
 

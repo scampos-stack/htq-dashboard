@@ -179,6 +179,52 @@ export async function getKeapAutomationsSummary(): Promise<
   return [...byCategory.values()];
 }
 
+export type KeapAutomation = {
+  id: number;
+  name: string;
+  status: string | null;
+  category: string;
+  activeContacts: number;
+  completedContacts: number;
+};
+
+export async function getKeapAutomations(): Promise<KeapAutomation[]> {
+  const supabase = supabaseServer();
+
+  const { data: campaigns, error: campaignsErr } = await supabase
+    .from("campaigns")
+    .select("id, name, status, category")
+    .eq("source", "keap")
+    .order("name");
+  if (campaignsErr) throw campaignsErr;
+  if (!campaigns?.length) return [];
+
+  const { data: snapshots, error: snapshotsErr } = await supabase
+    .from("campaign_stats_snapshot")
+    .select("campaign_id, active_contacts, completed_contacts, pulled_at")
+    .order("pulled_at", { ascending: false });
+  if (snapshotsErr) throw snapshotsErr;
+
+  const latestByCampaign = new Map<number, (typeof snapshots)[number]>();
+  for (const row of snapshots ?? []) {
+    if (!latestByCampaign.has(row.campaign_id)) {
+      latestByCampaign.set(row.campaign_id, row);
+    }
+  }
+
+  return campaigns.map((c) => {
+    const s = latestByCampaign.get(c.id);
+    return {
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      category: c.category ?? "uncategorized",
+      activeContacts: s?.active_contacts ?? 0,
+      completedContacts: s?.completed_contacts ?? 0,
+    };
+  });
+}
+
 export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
   const supabase = supabaseServer();
 
