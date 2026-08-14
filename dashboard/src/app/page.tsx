@@ -8,6 +8,8 @@ import {
 import { RangeSelect } from "@/components/RangeSelect";
 import { SyncButton } from "@/components/SyncButton";
 import { SourceNav } from "@/components/SourceNav";
+import { TopTabs } from "@/components/TopTabs";
+import { StatusFilter } from "@/components/StatusFilter";
 
 function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING" || status === "PUBLISHED";
@@ -212,13 +214,30 @@ export default async function Home({
   const rangeParam = typeof params.range === "string" ? params.range : "all";
   const sourceParam =
     typeof params.source === "string" ? params.source : "all";
+  const keapStatusParam =
+    typeof params.keapStatus === "string" ? params.keapStatus : "all";
+  const wpStatusParam =
+    typeof params.wpStatus === "string" ? params.wpStatus : "all";
 
-  const [campaigns, sourceSummary, keapAutomations, rangeTotals] = await Promise.all([
-    getCampaignsWithStats(),
-    getSourceSummary(),
-    getKeapAutomations(),
-    rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
-  ]);
+  const [allCampaigns, sourceSummary, allKeapAutomations, rangeTotals] =
+    await Promise.all([
+      getCampaignsWithStats(),
+      getSourceSummary(),
+      getKeapAutomations(),
+      rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
+    ]);
+
+  const wpStatusOptions = [...new Set(allCampaigns.map((c) => c.status).filter(Boolean))] as string[];
+  const keapStatusOptions = [...new Set(allKeapAutomations.map((a) => a.status).filter(Boolean))] as string[];
+
+  const campaigns =
+    wpStatusParam === "all"
+      ? allCampaigns
+      : allCampaigns.filter((c) => c.status === wpStatusParam);
+  const keapAutomations =
+    keapStatusParam === "all"
+      ? allKeapAutomations
+      : allKeapAutomations.filter((a) => a.status === keapStatusParam);
 
   const showAll = sourceParam === "all";
   const showWoodpecker = showAll || sourceParam === "woodpecker";
@@ -237,7 +256,10 @@ export default async function Home({
             <span className="text-charcoal">QUOTES</span>
           </h1>
         </div>
-        <SyncButton />
+        <div className="flex items-center gap-4">
+          <TopTabs active="client" />
+          <SyncButton />
+        </div>
       </header>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10 sm:flex-row sm:px-10">
@@ -259,6 +281,17 @@ export default async function Home({
 
           {showKeapAutomations && (
             <SectionBlock title="Keap Automations" accent="border-amber-500">
+              {keapStatusOptions.length > 0 && (
+                <div className="mb-4 flex justify-end">
+                  <Suspense fallback={null}>
+                    <StatusFilter
+                      paramName="keapStatus"
+                      options={keapStatusOptions}
+                      label="Status"
+                    />
+                  </Suspense>
+                </div>
+              )}
               <KeapAutomationsList automations={keapAutomations} />
             </SectionBlock>
           )}
@@ -278,13 +311,22 @@ export default async function Home({
               }
               accent="border-brand-green"
             >
-              {!showAll && (
-                <div className="mb-4 flex justify-end">
+              <div className="mb-4 flex flex-wrap justify-end gap-3">
+                {wpStatusOptions.length > 0 && (
+                  <Suspense fallback={null}>
+                    <StatusFilter
+                      paramName="wpStatus"
+                      options={wpStatusOptions}
+                      label="Status"
+                    />
+                  </Suspense>
+                )}
+                {!showAll && (
                   <Suspense fallback={null}>
                     <RangeSelect />
                   </Suspense>
-                </div>
-              )}
+                )}
+              </div>
               {campaigns.length === 0 ? (
                 <p className="text-body-gray">
                   No campaigns yet — run the import scripts to load Woodpecker

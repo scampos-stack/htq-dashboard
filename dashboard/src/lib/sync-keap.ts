@@ -86,3 +86,73 @@ export async function syncKeap(): Promise<{
 
   return { campaigns: campaignsPayload.length, snapshots: snapshotPayload.length };
 }
+
+type KeapEmail = {
+  opened_date: string | null;
+  clicked_date: string | null;
+};
+
+// Account-wide totals only — Keap's /emails records carry no campaign or
+// automation ID, so this can't be broken out per automation/broadcast.
+// "delivered" is approximated as sent (no bounce field is exposed on this
+// endpoint; Keap's own dashboard shows bounce rates well under 1%).
+export async function syncKeapEmailAggregate(
+  days = 30
+): Promise<{ sent: number; opened: number; clicked: number }> {
+  const supabase = supabaseServer();
+
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceParam = encodeURIComponent(since.toISOString());
+
+  let sent = 0;
+  let opened = 0;
+  let clicked = 0;
+  let path = `/emails?limit=1000&since_sent_date=${sinceParam}`;
+
+  for (let page = 0; page < 20 && path; page++) {
+    const data = await keapFetch(path);
+    const emails: KeapEmail[] = data.emails ?? [];
+    sent += emails.length;
+    opened += emails.filter((e) => e.opened_date).length;
+    clicked += emails.filter((e) => e.clicked_date).length;
+
+    if (!data.next) break;
+    path = data.next.replace(API_BASE, "");
+  }
+
+  const externalId = "__all_emails__";
+  const { data: campaign, error: campaignErr } = await supabase
+    .from("campaigns")
+    .upsert(
+      {
+        source: "keap",
+        external_id: externalId,
+        name: `All Keap Marketing Emails (last ${days}d)`,
+        category: "email_aggregate",
+      },
+      { onConflict: "source,external_id" }
+    )
+    .select("id")
+    .single();
+  if (campaignErr) throw campaignErr;
+
+  const { error: snapshotErr } = await supabase
+    .from("campaign_stats_snapshot")
+    .upsert(
+      {
+        campaign_id: campaign.id,
+        step: null,
+        version: null,
+        sent,
+        delivered: sent,
+        opened,
+        opened_rate: sent ? Number(((opened / sent) * 100).toFixed(1)) : null,
+        clicked,
+      },
+      { onConflict: "campaign_id,step,version,pulled_at" }
+    );
+  if (snapshotErr) throw snapshotErr;
+
+  return { sent, opened, clicked };
+}

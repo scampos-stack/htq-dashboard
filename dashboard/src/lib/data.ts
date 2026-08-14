@@ -105,17 +105,22 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
     }
   }
 
-  const broadcastPlaceholder: SourceSummaryRow = {
-    key: "keap_broadcast",
-    label: "Keap Broadcasts",
-    connected: false,
-    sent: 0,
-    delivered: 0,
-    opened: 0,
-    clicked: 0,
+  const keapEmailsSnapshot = [...latestByCampaign.entries()].find(
+    ([campaignId, s]) =>
+      sourceByCampaign.get(campaignId) === "keap" && s.sent > 0
+  )?.[1];
+
+  const keapEmails: SourceSummaryRow = {
+    key: "keap_emails",
+    label: "Keap Marketing Emails (all types, account-wide)",
+    connected: !!keapEmailsSnapshot,
+    sent: keapEmailsSnapshot?.sent ?? 0,
+    delivered: keapEmailsSnapshot?.delivered ?? 0,
+    opened: keapEmailsSnapshot?.opened ?? 0,
+    clicked: keapEmailsSnapshot?.clicked ?? 0,
   };
 
-  return [woodpecker, broadcastPlaceholder];
+  return [woodpecker, keapEmails];
 }
 
 export type KeapAutomationSummaryRow = {
@@ -195,6 +200,7 @@ export async function getKeapAutomations(): Promise<KeapAutomation[]> {
     .from("campaigns")
     .select("id, name, status, category")
     .eq("source", "keap")
+    .neq("category", "email_aggregate")
     .order("name");
   if (campaignsErr) throw campaignsErr;
   if (!campaigns?.length) return [];
