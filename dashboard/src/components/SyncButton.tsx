@@ -19,8 +19,20 @@ export function SyncButton() {
       if (!res.ok || !data.ok) {
         throw new Error(data.error ?? "Sync failed");
       }
+      const parts: string[] = [];
+      if (data.woodpecker?.campaigns != null) {
+        parts.push(`Woodpecker: ${data.woodpecker.campaigns} campaigns`);
+      } else if (data.woodpecker?.error) {
+        parts.push(`Woodpecker failed`);
+      }
+      if (data.keap?.campaigns != null) {
+        parts.push(`Keap: ${data.keap.campaigns} automations`);
+      } else if (data.keap?.error) {
+        parts.push(`Keap failed`);
+      }
+
       setStatus("done");
-      setMessage(`Synced ${data.campaigns} campaigns`);
+      setMessage(parts.join(" · ") || "Synced");
       router.refresh();
     } catch (err) {
       setStatus("error");

@@ -105,37 +105,78 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
     }
   }
 
-  const placeholders: SourceSummaryRow[] = [
-    {
-      key: "keap_broadcast",
-      label: "Keap Broadcasts",
-      connected: false,
-      sent: 0,
-      delivered: 0,
-      opened: 0,
-      clicked: 0,
-    },
-    {
-      key: "keap_automation_lead_marketing",
-      label: "Keap Automations — Lead Marketing",
-      connected: false,
-      sent: 0,
-      delivered: 0,
-      opened: 0,
-      clicked: 0,
-    },
-    {
-      key: "keap_automation_customer_comms",
-      label: "Keap Automations — Customer/Comms",
-      connected: false,
-      sent: 0,
-      delivered: 0,
-      opened: 0,
-      clicked: 0,
-    },
-  ];
+  const broadcastPlaceholder: SourceSummaryRow = {
+    key: "keap_broadcast",
+    label: "Keap Broadcasts",
+    connected: false,
+    sent: 0,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+  };
 
-  return [woodpecker, ...placeholders];
+  return [woodpecker, broadcastPlaceholder];
+}
+
+export type KeapAutomationSummaryRow = {
+  category: string;
+  label: string;
+  automationCount: number;
+  activeContacts: number;
+  completedContacts: number;
+};
+
+export async function getKeapAutomationsSummary(): Promise<
+  KeapAutomationSummaryRow[]
+> {
+  const supabase = supabaseServer();
+
+  const { data: campaigns, error: campaignsErr } = await supabase
+    .from("campaigns")
+    .select("id, category")
+    .eq("source", "keap");
+  if (campaignsErr) throw campaignsErr;
+  if (!campaigns?.length) return [];
+
+  const { data: snapshots, error: snapshotsErr } = await supabase
+    .from("campaign_stats_snapshot")
+    .select("campaign_id, active_contacts, completed_contacts, pulled_at")
+    .order("pulled_at", { ascending: false });
+  if (snapshotsErr) throw snapshotsErr;
+
+  const latestByCampaign = new Map<number, (typeof snapshots)[number]>();
+  for (const row of snapshots ?? []) {
+    if (!latestByCampaign.has(row.campaign_id)) {
+      latestByCampaign.set(row.campaign_id, row);
+    }
+  }
+
+  const labels: Record<string, string> = {
+    automation_lead_marketing: "Lead Marketing",
+    automation_customer_comms: "Customer / Comms",
+  };
+
+  const byCategory = new Map<string, KeapAutomationSummaryRow>();
+  for (const c of campaigns) {
+    const category = c.category ?? "uncategorized";
+    const row =
+      byCategory.get(category) ??
+      ({
+        category,
+        label: labels[category] ?? category,
+        automationCount: 0,
+        activeContacts: 0,
+        completedContacts: 0,
+      } satisfies KeapAutomationSummaryRow);
+
+    const s = latestByCampaign.get(c.id);
+    row.automationCount += 1;
+    row.activeContacts += s?.active_contacts ?? 0;
+    row.completedContacts += s?.completed_contacts ?? 0;
+    byCategory.set(category, row);
+  }
+
+  return [...byCategory.values()];
 }
 
 export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
@@ -144,6 +185,7 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
   const { data: campaigns, error: campaignsErr } = await supabase
     .from("campaigns")
     .select("id, source, name, owner, status")
+    .eq("source", "woodpecker")
     .order("name");
   if (campaignsErr) throw campaignsErr;
   if (!campaigns?.length) return [];

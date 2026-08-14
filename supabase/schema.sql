@@ -38,6 +38,8 @@ create table if not exists campaign_stats_snapshot (
   interested_yes   int,
   interested_maybe int,
   interested_no    int,
+  active_contacts    int,  -- Keap automations: contacts currently mid-sequence
+  completed_contacts int,  -- Keap automations: contacts who finished the sequence
   unique (campaign_id, step, version, pulled_at)
 );
 

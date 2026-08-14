@@ -3,9 +3,11 @@ import {
   getCampaignsWithStats,
   getDailyRangeTotals,
   getSourceSummary,
+  getKeapAutomationsSummary,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
 import { SyncButton } from "@/components/SyncButton";
+import { SourceNav } from "@/components/SourceNav";
 
 function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING";
@@ -34,6 +36,25 @@ function Metric({ label, value }: { label: string; value: string }) {
 function pct(numerator: number, denominator: number): string {
   if (!denominator) return "—";
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
+}
+
+function SectionBlock({
+  title,
+  accent,
+  children,
+}: {
+  title: string;
+  accent: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mb-10">
+      <div className={`mb-4 flex items-center gap-2 border-l-4 ${accent} pl-3`}>
+        <h2 className="font-heading text-xl font-semibold text-charcoal">{title}</h2>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 function SourceSummaryTable({
@@ -105,17 +126,78 @@ function SourceSummaryTable({
   );
 }
 
+function KeapAutomationsTable({
+  rows,
+}: {
+  rows: Awaited<ReturnType<typeof getKeapAutomationsSummary>>;
+}) {
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-3xl bg-white p-6 text-sm text-body-gray shadow-sm">
+        No Keap automations synced yet — click &quot;Sync Now&quot; above.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+      <table className="w-full min-w-[480px] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+            <th className="py-2 pr-4">Category</th>
+            <th className="py-2 pr-4">Automations</th>
+            <th className="py-2 pr-4">Active Contacts</th>
+            <th className="py-2 pr-4">Completed Contacts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.category} className="border-b border-black/5">
+              <td className="py-3 pr-4 font-semibold text-charcoal">{r.label}</td>
+              <td className="py-3 pr-4">{r.automationCount}</td>
+              <td className="py-3 pr-4">{r.activeContacts.toLocaleString()}</td>
+              <td className="py-3 pr-4">{r.completedContacts.toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-4 text-xs text-body-gray">
+        Category is a first-pass keyword guess (no native field from Keap) —
+        review and correct as needed. Keap&apos;s API doesn&apos;t expose
+        per-email open/click stats for automations, only contact-flow volume.
+      </p>
+    </div>
+  );
+}
+
+function KeapBroadcastsPlaceholder() {
+  return (
+    <div className="rounded-3xl bg-white p-6 text-sm text-body-gray shadow-sm">
+      Not connected yet — Keap broadcast (one-off email) stats aren&apos;t wired
+      up. This block is reserved for that once it&apos;s built.
+    </div>
+  );
+}
+
 export default async function Home({
   searchParams,
 }: PageProps<"/">) {
   const params = await searchParams;
   const rangeParam = typeof params.range === "string" ? params.range : "all";
+  const sourceParam =
+    typeof params.source === "string" ? params.source : "all";
 
-  const [campaigns, sourceSummary, rangeTotals] = await Promise.all([
+  const [campaigns, sourceSummary, keapSummary, rangeTotals] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
+    getKeapAutomationsSummary(),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
   ]);
+
+  const showAll = sourceParam === "all";
+  const showWoodpecker = showAll || sourceParam === "woodpecker";
+  const showKeapAutomations = showAll || sourceParam === "keap_automations";
+  const showKeapBroadcasts = showAll || sourceParam === "keap_broadcasts";
 
   return (
     <div className="flex-1 bg-mist">
@@ -132,103 +214,135 @@ export default async function Home({
         <SyncButton />
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 className="font-heading text-xl font-semibold text-charcoal">
-            All Sources — Overview
-          </h2>
-          <Suspense fallback={null}>
-            <RangeSelect />
-          </Suspense>
-        </div>
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10 sm:flex-row sm:px-10">
+        <Suspense fallback={null}>
+          <SourceNav />
+        </Suspense>
 
-        <div className="mb-10">
-          <SourceSummaryTable rows={sourceSummary} />
-        </div>
-
-        <h2 className="mb-6 font-heading text-xl font-semibold text-charcoal">
-          Woodpecker Campaigns
-          {rangeTotals && (
-            <span className="ml-2 text-sm font-normal text-body-gray">
-              (last {rangeParam} days)
-            </span>
+        <main className="min-w-0 flex-1">
+          {showAll && (
+            <SectionBlock title="All Sources — Overview" accent="border-charcoal">
+              <div className="mb-4 flex justify-end">
+                <Suspense fallback={null}>
+                  <RangeSelect />
+                </Suspense>
+              </div>
+              <SourceSummaryTable rows={sourceSummary} />
+            </SectionBlock>
           )}
-        </h2>
 
-        {campaigns.length === 0 ? (
-          <p className="text-body-gray">
-            No campaigns yet — run the import scripts to load Woodpecker data.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {campaigns.map((c) => {
-              const rangeStats = rangeTotals?.get(c.id);
-              const sent = rangeStats ? rangeStats.sent : c.stats?.sent ?? 0;
-              const delivered = rangeStats
-                ? rangeStats.delivered
-                : c.stats?.delivered ?? 0;
-              const opened = rangeStats ? rangeStats.opened : c.stats?.opened ?? 0;
-              const openRate = rangeStats
-                ? pct(opened, delivered)
-                : c.stats?.opened_rate != null
-                ? `${c.stats.opened_rate}%`
-                : "—";
+          {showKeapAutomations && (
+            <SectionBlock title="Keap Automations" accent="border-amber-500">
+              <KeapAutomationsTable rows={keapSummary} />
+            </SectionBlock>
+          )}
 
-              return (
-                <div
-                  key={c.id}
-                  className="rounded-3xl border-l-4 border-brand-green bg-white p-6 shadow-sm"
-                >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <h3 className="font-heading text-lg font-semibold text-charcoal">
-                      {c.name}
-                    </h3>
-                    <StatusPill status={c.status} />
-                  </div>
+          {showKeapBroadcasts && (
+            <SectionBlock title="Keap Broadcasts" accent="border-sky-500">
+              <KeapBroadcastsPlaceholder />
+            </SectionBlock>
+          )}
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <Metric label="Sent" value={sent.toLocaleString()} />
-                    <Metric label="Open rate" value={openRate} />
-                    <Metric
-                      label="Clicked"
-                      value={
-                        rangeStats
-                          ? "—"
-                          : (c.stats?.clicked ?? 0).toLocaleString()
-                      }
-                    />
-                    <Metric label="Delivered" value={delivered.toLocaleString()} />
-                    <Metric
-                      label="Bounce rate"
-                      value={
-                        rangeStats
-                          ? "—"
-                          : c.stats?.bounce_rate != null
-                          ? `${c.stats.bounce_rate}%`
-                          : "—"
-                      }
-                    />
-                    <Metric
-                      label="Responded"
-                      value={
-                        rangeStats
-                          ? "—"
-                          : (c.stats?.responded ?? 0).toLocaleString()
-                      }
-                    />
-                  </div>
-
-                  {c.stats && !rangeStats && (
-                    <p className="mt-4 text-xs text-body-gray">
-                      Last pulled {new Date(c.stats.pulled_at).toLocaleDateString()}
-                    </p>
-                  )}
+          {showWoodpecker && (
+            <SectionBlock
+              title={
+                rangeTotals
+                  ? `Woodpecker Campaigns (last ${rangeParam} days)`
+                  : "Woodpecker Campaigns"
+              }
+              accent="border-brand-green"
+            >
+              {!showAll && (
+                <div className="mb-4 flex justify-end">
+                  <Suspense fallback={null}>
+                    <RangeSelect />
+                  </Suspense>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
+              )}
+              {campaigns.length === 0 ? (
+                <p className="text-body-gray">
+                  No campaigns yet — run the import scripts to load Woodpecker
+                  data.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  {campaigns.map((c) => {
+                    const rangeStats = rangeTotals?.get(c.id);
+                    const sent = rangeStats ? rangeStats.sent : c.stats?.sent ?? 0;
+                    const delivered = rangeStats
+                      ? rangeStats.delivered
+                      : c.stats?.delivered ?? 0;
+                    const opened = rangeStats
+                      ? rangeStats.opened
+                      : c.stats?.opened ?? 0;
+                    const openRate = rangeStats
+                      ? pct(opened, delivered)
+                      : c.stats?.opened_rate != null
+                      ? `${c.stats.opened_rate}%`
+                      : "—";
+
+                    return (
+                      <div
+                        key={c.id}
+                        className="rounded-3xl border-l-4 border-brand-green bg-white p-6 shadow-sm"
+                      >
+                        <div className="mb-4 flex items-start justify-between gap-3">
+                          <h3 className="font-heading text-lg font-semibold text-charcoal">
+                            {c.name}
+                          </h3>
+                          <StatusPill status={c.status} />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4">
+                          <Metric label="Sent" value={sent.toLocaleString()} />
+                          <Metric label="Open rate" value={openRate} />
+                          <Metric
+                            label="Clicked"
+                            value={
+                              rangeStats
+                                ? "—"
+                                : (c.stats?.clicked ?? 0).toLocaleString()
+                            }
+                          />
+                          <Metric
+                            label="Delivered"
+                            value={delivered.toLocaleString()}
+                          />
+                          <Metric
+                            label="Bounce rate"
+                            value={
+                              rangeStats
+                                ? "—"
+                                : c.stats?.bounce_rate != null
+                                ? `${c.stats.bounce_rate}%`
+                                : "—"
+                            }
+                          />
+                          <Metric
+                            label="Responded"
+                            value={
+                              rangeStats
+                                ? "—"
+                                : (c.stats?.responded ?? 0).toLocaleString()
+                            }
+                          />
+                        </div>
+
+                        {c.stats && !rangeStats && (
+                          <p className="mt-4 text-xs text-body-gray">
+                            Last pulled{" "}
+                            {new Date(c.stats.pulled_at).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </SectionBlock>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
