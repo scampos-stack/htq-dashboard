@@ -75,12 +75,16 @@ export type CarrierSummaryRow = {
 export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
   const supabase = supabaseServer();
 
-  const { data: campaigns, error: campaignsErr } = await supabase
+  const { data: allCampaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, carrier, category")
-    .neq("category", "email_aggregate");
+    .select("id, carrier, category");
   if (campaignsErr) throw campaignsErr;
-  if (!campaigns?.length) return [];
+  // Filtered in JS, not SQL — a `.neq()` on a nullable column silently drops
+  // every row where category IS NULL (Woodpecker campaigns never set it).
+  const campaigns = (allCampaigns ?? []).filter(
+    (c) => c.category !== "email_aggregate"
+  );
+  if (!campaigns.length) return [];
 
   const { data: snapshots, error: snapshotsErr } = await supabase
     .from("campaign_stats_snapshot")
