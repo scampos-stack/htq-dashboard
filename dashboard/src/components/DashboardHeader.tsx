@@ -1,5 +1,6 @@
 import { TopTabs } from "@/components/TopTabs";
 import { SyncButton } from "@/components/SyncButton";
+import { SignOutButton } from "@/components/SignOutButton";
 
 export function DashboardHeader({
   active,
@@ -23,8 +24,9 @@ export function DashboardHeader({
           <TopTabs active={active} />
         </div>
 
-        <div className="flex justify-center sm:justify-end">
+        <div className="flex flex-col items-center gap-2 sm:items-end">
           <SyncButton />
+          <SignOutButton />
         </div>
       </div>
     </header>

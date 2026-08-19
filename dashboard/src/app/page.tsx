@@ -5,12 +5,18 @@ import {
   getSourceSummary,
   getKeapAutomations,
   getCarrierSummary,
+  getKeapBroadcasts,
+  getVipSubmissions,
+  getChannelBlendSummary,
+  getKeapAutomationEventVolume,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
 import { SourceNav } from "@/components/SourceNav";
 import { StatusFilter } from "@/components/StatusFilter";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { CarrierEditor } from "@/components/CarrierEditor";
+import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
+import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 
 function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING" || status === "PUBLISHED";
@@ -172,6 +178,66 @@ function CarrierSummaryTable({
   );
 }
 
+function KeapAutomationEventVolumeTable({
+  events,
+}: {
+  events: Awaited<ReturnType<typeof getKeapAutomationEventVolume>>;
+}) {
+  if (events.length === 0) {
+    return (
+      <div className="mb-6 rounded-3xl bg-white p-6 text-sm text-body-gray shadow-sm">
+        No automation events received yet. This fills in once Keap&apos;s
+        automation steps are configured to call{" "}
+        <code className="rounded bg-charcoal/5 px-1">/api/webhooks/keap</code>{" "}
+        — Keap&apos;s API has no way to pull this after the fact, so it only
+        populates going forward.
+      </div>
+    );
+  }
+
+  const byDate = new Map<string, Map<string, number>>();
+  const eventTypes = new Set<string>();
+  for (const e of events) {
+    eventTypes.add(e.eventType);
+    const row = byDate.get(e.date) ?? new Map();
+    row.set(e.eventType, e.count);
+    byDate.set(e.date, row);
+  }
+  const types = [...eventTypes];
+
+  return (
+    <div className="mb-6 overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+      <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+        Automation Event Volume (last 30 days)
+      </h3>
+      <table className="w-full min-w-[420px] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+            <th className="py-2 pr-4">Date</th>
+            {types.map((t) => (
+              <th key={t} className="py-2 pr-4">
+                {t}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {[...byDate.entries()].map(([date, row]) => (
+            <tr key={date} className="border-b border-black/5">
+              <td className="py-3 pr-4 font-semibold text-charcoal">{date}</td>
+              {types.map((t) => (
+                <td key={t} className="py-3 pr-4">
+                  {(row.get(t) ?? 0).toLocaleString()}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   automation_lead_marketing: "Lead Marketing",
   automation_customer_comms: "Customer / Comms",
@@ -246,11 +312,165 @@ function KeapAutomationsList({
   );
 }
 
-function KeapBroadcastsPlaceholder() {
+function KeapBroadcastsList({
+  broadcasts,
+}: {
+  broadcasts: Awaited<ReturnType<typeof getKeapBroadcasts>>;
+}) {
   return (
-    <div className="rounded-3xl bg-white p-6 text-sm text-body-gray shadow-sm">
-      Not connected yet — Keap broadcast (one-off email) stats aren&apos;t wired
-      up. This block is reserved for that once it&apos;s built.
+    <div>
+      <KeapBroadcastForm />
+      {broadcasts.length === 0 ? (
+        <p className="text-body-gray">
+          No broadcasts logged yet — Keap&apos;s API doesn&apos;t expose
+          broadcast performance, so add them here manually.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          {broadcasts.map((b) => (
+            <div
+              key={b.id}
+              className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm"
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <h3 className="font-heading text-lg font-semibold text-charcoal">
+                  {b.campaignName}
+                </h3>
+                <span className="text-xs text-body-gray">
+                  {new Date(b.dateSent + "T00:00:00").toLocaleDateString()}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <Metric label="Delivered" value={b.emailsDelivered.toLocaleString()} />
+                <Metric label="Opens" value={b.opens.toLocaleString()} />
+                <Metric label="Clicks" value={b.clicks.toLocaleString()} />
+                <Metric label="Replies" value={b.replies.toLocaleString()} />
+                <Metric
+                  label="Open rate"
+                  value={pct(b.opens, b.emailsDelivered)}
+                />
+                <Metric
+                  label="CTR"
+                  value={pct(b.clicks, b.emailsDelivered)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChannelBlendSection({
+  summary,
+}: {
+  summary: Awaited<ReturnType<typeof getChannelBlendSummary>>;
+}) {
+  return (
+    <div>
+      <ChannelBlendUpload />
+
+      <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
+          <Metric label="Total Rows" value={summary.totalRows.toLocaleString()} />
+        </div>
+        <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
+          <Metric
+            label="Appointments Booked"
+            value={summary.appointmentsBooked.toLocaleString()}
+          />
+        </div>
+      </div>
+
+      {summary.byCategory.length > 0 && (
+        <div className="mb-6 overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+          <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+            Breakdown by Category
+          </h3>
+          <table className="w-full min-w-[320px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+                <th className="py-2 pr-4">Category</th>
+                <th className="py-2 pr-4">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.byCategory.map((c) => (
+                <tr key={c.category} className="border-b border-black/5">
+                  <td className="py-3 pr-4 font-semibold text-charcoal">{c.category}</td>
+                  <td className="py-3 pr-4">{c.count.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {summary.recent.length > 0 && (
+        <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+          <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+            Recent Entries
+          </h3>
+          <table className="w-full min-w-[560px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+                <th className="py-2 pr-4">Category</th>
+                <th className="py-2 pr-4">Lead</th>
+                <th className="py-2 pr-4">State</th>
+                <th className="py-2 pr-4">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.recent.map((r) => (
+                <tr key={r.id} className="border-b border-black/5">
+                  <td className="py-3 pr-4 font-semibold text-charcoal">{r.category}</td>
+                  <td className="py-3 pr-4">{r.leadName ?? "—"}</td>
+                  <td className="py-3 pr-4">{r.state ?? "—"}</td>
+                  <td className="py-3 pr-4 max-w-xs truncate" title={r.details ?? ""}>
+                    {r.details ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VipSubmissionsWidget({
+  submissions,
+}: {
+  submissions: Awaited<ReturnType<typeof getVipSubmissions>>;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+      {submissions.length === 0 ? (
+        <p className="text-sm text-body-gray">No VIP form submissions yet.</p>
+      ) : (
+        <table className="w-full min-w-[480px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+              <th className="py-2 pr-4">Submission Date</th>
+              <th className="py-2 pr-4">Contact Name</th>
+              <th className="py-2 pr-4">Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            {submissions.map((s) => (
+              <tr key={s.contactId} className="border-b border-black/5">
+                <td className="py-3 pr-4">
+                  {new Date(s.dateApplied).toLocaleDateString()}
+                </td>
+                <td className="py-3 pr-4 font-semibold text-charcoal">{s.name}</td>
+                <td className="py-3 pr-4">{s.email ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -267,14 +487,27 @@ export default async function Home({
   const wpStatusParam =
     typeof params.wpStatus === "string" ? params.wpStatus : "all";
 
-  const [allCampaigns, sourceSummary, carrierSummary, allKeapAutomations, rangeTotals] =
-    await Promise.all([
-      getCampaignsWithStats(),
-      getSourceSummary(),
-      getCarrierSummary(),
-      getKeapAutomations(),
-      rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
-    ]);
+  const [
+    allCampaigns,
+    sourceSummary,
+    carrierSummary,
+    allKeapAutomations,
+    keapBroadcasts,
+    vipSubmissions,
+    channelBlendSummary,
+    keapAutomationEvents,
+    rangeTotals,
+  ] = await Promise.all([
+    getCampaignsWithStats(),
+    getSourceSummary(),
+    getCarrierSummary(),
+    getKeapAutomations(),
+    getKeapBroadcasts(),
+    getVipSubmissions(),
+    getChannelBlendSummary(),
+    getKeapAutomationEventVolume(),
+    rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
+  ]);
 
   const wpStatusOptions = [...new Set(allCampaigns.map((c) => c.status).filter(Boolean))] as string[];
   const keapStatusOptions = [...new Set(allKeapAutomations.map((a) => a.status).filter(Boolean))] as string[];
@@ -292,6 +525,7 @@ export default async function Home({
   const showWoodpecker = showAll || sourceParam === "woodpecker";
   const showKeapAutomations = showAll || sourceParam === "keap_automations";
   const showKeapBroadcasts = showAll || sourceParam === "keap_broadcasts";
+  const showChannelBlend = showAll || sourceParam === "channel_blend";
 
   return (
     <div className="flex-1 bg-mist">
@@ -320,6 +554,12 @@ export default async function Home({
             </SectionBlock>
           )}
 
+          {showAll && (
+            <SectionBlock title="VIP Form Submissions" accent="border-charcoal">
+              <VipSubmissionsWidget submissions={vipSubmissions} />
+            </SectionBlock>
+          )}
+
           {showKeapAutomations && (
             <SectionBlock title="Keap Automations" accent="border-amber-500">
               {keapStatusOptions.length > 0 && (
@@ -333,13 +573,20 @@ export default async function Home({
                   </Suspense>
                 </div>
               )}
+              <KeapAutomationEventVolumeTable events={keapAutomationEvents} />
               <KeapAutomationsList automations={keapAutomations} />
             </SectionBlock>
           )}
 
           {showKeapBroadcasts && (
             <SectionBlock title="Keap Broadcasts" accent="border-sky-500">
-              <KeapBroadcastsPlaceholder />
+              <KeapBroadcastsList broadcasts={keapBroadcasts} />
+            </SectionBlock>
+          )}
+
+          {showChannelBlend && (
+            <SectionBlock title="Channel Blend" accent="border-violet-500">
+              <ChannelBlendSection summary={channelBlendSummary} />
             </SectionBlock>
           )}
 

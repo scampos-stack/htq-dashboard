@@ -7,6 +7,7 @@ const SOURCES = [
   { value: "woodpecker", label: "Woodpecker", dot: "bg-brand-green" },
   { value: "keap_automations", label: "Keap Automations", dot: "bg-amber-500" },
   { value: "keap_broadcasts", label: "Keap Broadcasts", dot: "bg-sky-500" },
+  { value: "channel_blend", label: "Channel Blend", dot: "bg-violet-500" },
 ];
 
 export function SourceNav() {

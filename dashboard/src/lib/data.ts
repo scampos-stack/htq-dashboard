@@ -1,5 +1,147 @@
 import { supabaseServer } from "./supabase-server";
 
+export type ChannelBlendSummary = {
+  totalRows: number;
+  appointmentsBooked: number;
+  byCategory: { category: string; count: number }[];
+  recent: {
+    id: number;
+    category: string;
+    leadName: string | null;
+    state: string | null;
+    details: string | null;
+    createdAt: string;
+  }[];
+};
+
+export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
+  const supabase = supabaseServer();
+
+  const { data, error } = await supabase
+    .from("channel_blend_dispositions")
+    .select("id, category, lead_name, state, details, created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const byCategoryMap = new Map<string, number>();
+  for (const r of rows) {
+    byCategoryMap.set(r.category, (byCategoryMap.get(r.category) ?? 0) + 1);
+  }
+
+  return {
+    totalRows: rows.length,
+    appointmentsBooked: byCategoryMap.get("Appointments") ?? 0,
+    byCategory: [...byCategoryMap.entries()]
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count),
+    recent: rows.slice(0, 25).map((r) => ({
+      id: r.id,
+      category: r.category,
+      leadName: r.lead_name,
+      state: r.state,
+      details: r.details,
+      createdAt: r.created_at,
+    })),
+  };
+}
+
+export type KeapAutomationEventVolume = {
+  date: string;
+  eventType: string;
+  count: number;
+};
+
+// Populated by the /api/webhooks/keap endpoint, if Keap's automations are
+// configured to call it. Empty until that's wired up on Keap's side.
+export async function getKeapAutomationEventVolume(
+  days = 30
+): Promise<KeapAutomationEventVolume[]> {
+  const supabase = supabaseServer();
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+
+  const { data, error } = await supabase
+    .from("keap_automation_events")
+    .select("event_type, occurred_at")
+    .gte("occurred_at", since.toISOString());
+  if (error) throw error;
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const date = row.occurred_at.slice(0, 10);
+    const key = `${date}|${row.event_type}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([key, count]) => {
+      const [date, eventType] = key.split("|");
+      return { date, eventType, count };
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+export type KeapBroadcast = {
+  id: number;
+  campaignName: string;
+  dateSent: string;
+  emailsDelivered: number;
+  opens: number;
+  clicks: number;
+  replies: number;
+};
+
+export async function getKeapBroadcasts(): Promise<KeapBroadcast[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("keap_broadcasts")
+    .select("id, campaign_name, date_sent, emails_delivered, opens, clicks, replies")
+    .order("date_sent", { ascending: false });
+  if (error) throw error;
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    campaignName: r.campaign_name,
+    dateSent: r.date_sent,
+    emailsDelivered: r.emails_delivered,
+    opens: r.opens,
+    clicks: r.clicks,
+    replies: r.replies,
+  }));
+}
+
+export type VipSubmission = {
+  contactId: number;
+  name: string;
+  email: string | null;
+  dateApplied: string;
+};
+
+export async function getVipSubmissions(): Promise<VipSubmission[]> {
+  const key = process.env.KEAP_API_KEY;
+  if (!key) return [];
+
+  const VIP_TAG_ID = 16422;
+  const res = await fetch(
+    `https://api.infusionsoft.com/crm/rest/v1/tags/${VIP_TAG_ID}/contacts?limit=50&order=date_applied&order_direction=DESCENDING`,
+    { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" }
+  );
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  type VipRow = {
+    contact: { id: number; email?: string; first_name?: string; last_name?: string };
+    date_applied: string;
+  };
+  return ((data.contacts ?? []) as VipRow[]).map((row) => ({
+    contactId: row.contact.id,
+    name: [row.contact.first_name, row.contact.last_name].filter(Boolean).join(" ") || "(no name)",
+    email: row.contact.email ?? null,
+    dateApplied: row.date_applied,
+  }));
+}
+
 export type CampaignWithStats = {
   id: number;
   source: string;
