@@ -8,6 +8,7 @@ import {
   getKeapBroadcasts,
   getVipSubmissions,
   getChannelBlendSummary,
+  getChannelBlendAutomationStats,
   getKeapAutomationEventVolume,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
@@ -364,14 +365,16 @@ function KeapBroadcastsList({
 
 function ChannelBlendSection({
   summary,
+  automationStats,
 }: {
   summary: Awaited<ReturnType<typeof getChannelBlendSummary>>;
+  automationStats: Awaited<ReturnType<typeof getChannelBlendAutomationStats>>;
 }) {
   return (
     <div>
       <ChannelBlendUpload />
 
-      <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
           <Metric label="Total Rows" value={summary.totalRows.toLocaleString()} />
         </div>
@@ -381,7 +384,43 @@ function ChannelBlendSection({
             value={summary.appointmentsBooked.toLocaleString()}
           />
         </div>
+        <div className="rounded-3xl border-l-4 border-amber-500 bg-white p-6 shadow-sm">
+          <Metric
+            label="Follow-up Emails Sent"
+            value={automationStats.totalEmailsSent.toLocaleString()}
+          />
+        </div>
       </div>
+
+      {automationStats.recentEvents.length > 0 && (
+        <div className="mb-6 overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+          <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+            Recent Follow-up Emails (Channel Blend → Keap Automation)
+          </h3>
+          <table className="w-full min-w-[320px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+                <th className="py-2 pr-4">Contact Email</th>
+                <th className="py-2 pr-4">Sent At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {automationStats.recentEvents.map((e, i) => (
+                <tr key={i} className="border-b border-black/5">
+                  <td className="py-3 pr-4">{e.contactEmail ?? "—"}</td>
+                  <td className="py-3 pr-4 text-body-gray">
+                    {new Date(e.occurredAt).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-3 text-xs text-body-gray">
+            From the &quot;Channel Blend - Email Request&quot; automation&apos;s
+            webhook step — ties a spreadsheet email request to the actual send.
+          </p>
+        </div>
+      )}
 
       {summary.byCategory.length > 0 && (
         <div className="mb-6 overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
@@ -495,6 +534,7 @@ export default async function Home({
     keapBroadcasts,
     vipSubmissions,
     channelBlendSummary,
+    channelBlendAutomationStats,
     keapAutomationEvents,
     rangeTotals,
   ] = await Promise.all([
@@ -505,6 +545,7 @@ export default async function Home({
     getKeapBroadcasts(),
     getVipSubmissions(),
     getChannelBlendSummary(),
+    getChannelBlendAutomationStats(),
     getKeapAutomationEventVolume(),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
   ]);
@@ -586,7 +627,10 @@ export default async function Home({
 
           {showChannelBlend && (
             <SectionBlock title="Channel Blend" accent="border-violet-500">
-              <ChannelBlendSection summary={channelBlendSummary} />
+              <ChannelBlendSection
+                summary={channelBlendSummary}
+                automationStats={channelBlendAutomationStats}
+              />
             </SectionBlock>
           )}
 

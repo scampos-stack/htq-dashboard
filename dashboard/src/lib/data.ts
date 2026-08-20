@@ -82,6 +82,34 @@ export async function getKeapAutomationEventVolume(
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
+export type ChannelBlendAutomationStats = {
+  totalEmailsSent: number;
+  recentEvents: { contactEmail: string | null; occurredAt: string }[];
+};
+
+// Populated by the "Channel Blend - Email Request" Keap automation's HTTP
+// request step (see /api/webhooks/keap) — matched by name, not a fixed
+// carrier, so it keeps working if this expands beyond Farmers later.
+export async function getChannelBlendAutomationStats(): Promise<ChannelBlendAutomationStats> {
+  const supabase = supabaseServer();
+
+  const { data, error } = await supabase
+    .from("keap_automation_events")
+    .select("contact_email, occurred_at, event_type")
+    .ilike("automation_name", "%channel blend%")
+    .order("occurred_at", { ascending: false });
+  if (error) throw error;
+
+  const rows = data ?? [];
+  return {
+    totalEmailsSent: rows.filter((r) => r.event_type === "email_sent").length,
+    recentEvents: rows.slice(0, 10).map((r) => ({
+      contactEmail: r.contact_email,
+      occurredAt: r.occurred_at,
+    })),
+  };
+}
+
 export type KeapBroadcast = {
   id: number;
   campaignName: string;
