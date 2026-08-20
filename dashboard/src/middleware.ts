@@ -25,9 +25,16 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // If Supabase's auth check itself throws (e.g. a transient
+  // "JWT issued at future" clock-skew error), treat it as "not logged in"
+  // and redirect to /login instead of crashing the whole page.
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (err) {
+    console.error("[middleware] auth.getUser() failed:", err);
+  }
 
   const isLoginPage = request.nextUrl.pathname.startsWith("/login");
   const isSignupPage = request.nextUrl.pathname.startsWith("/signup");
