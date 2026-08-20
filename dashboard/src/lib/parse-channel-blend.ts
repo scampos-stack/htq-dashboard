@@ -14,7 +14,11 @@ export type ChannelBlendRow = {
   raw: Record<string, unknown>;
 };
 
-const HEADER_ALIASES: Record<string, string> = {
+// Known columns get promoted to first-class fields when present. Any other
+// column on any sheet is still captured in `raw` — a sheet with unrecognized
+// headers (e.g. a new "Sold" or "T&Cs Sent" tab with its own columns) is
+// never silently skipped, just stored generically.
+const HEADER_ALIASES: Record<string, keyof ChannelBlendRow> = {
   "lead name": "leadName",
   "new contact": "newContact",
   "phone number": "phoneNumber",
@@ -43,48 +47,53 @@ export async function parseChannelBlendWorkbook(
   for (const worksheet of workbook.worksheets) {
     const category = worksheet.name.trim();
     const headerRow = worksheet.getRow(1);
-    const columnMap = new Map<number, string>();
+
+    // colNumber -> raw header text, for every non-empty header cell —
+    // not filtered to known aliases, so unfamiliar sheets still parse.
+    const headers = new Map<number, string>();
     headerRow.eachCell((cell, colNumber) => {
-      const raw = (cellText(cell) ?? "").toLowerCase();
-      const field = HEADER_ALIASES[raw];
-      if (field) columnMap.set(colNumber, field);
+      const text = cellText(cell);
+      if (text) headers.set(colNumber, text);
     });
-    if (columnMap.size === 0) continue;
+    if (headers.size === 0) continue;
 
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
 
-      const record: Record<string, string | null> = {};
+      const raw: Record<string, string | null> = {};
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        const field = columnMap.get(colNumber);
-        if (field) record[field] = cellText(cell);
+        const header = headers.get(colNumber);
+        if (header) raw[header] = cellText(cell);
       });
 
-      const hasData = Object.values(record).some((v) => v && v.trim());
+      const hasData = Object.values(raw).some((v) => v && v.trim());
       if (!hasData) return;
 
-      const hashInput = [
-        category,
-        record.leadName,
-        record.phoneNumber,
-        record.emailOnFile,
-        record.details,
-      ]
-        .join("|")
-        .toLowerCase();
-      const rowHash = crypto.createHash("sha256").update(hashInput).digest("hex");
+      const known: Partial<ChannelBlendRow> = {};
+      for (const [header, value] of Object.entries(raw)) {
+        const field = HEADER_ALIASES[header.toLowerCase()];
+        if (field) known[field] = value as never;
+      }
+
+      const stableRaw = Object.fromEntries(
+        Object.entries(raw).sort(([a], [b]) => a.localeCompare(b))
+      );
+      const rowHash = crypto
+        .createHash("sha256")
+        .update(`${category}|${JSON.stringify(stableRaw)}`)
+        .digest("hex");
 
       rows.push({
         rowHash,
         category,
-        leadName: record.leadName ?? null,
-        newContact: record.newContact ?? null,
-        phoneNumber: record.phoneNumber ?? null,
-        state: record.state ?? null,
-        emailOnFile: record.emailOnFile ?? null,
-        preferredEmail: record.preferredEmail ?? null,
-        details: record.details ?? null,
-        raw: record,
+        leadName: known.leadName ?? null,
+        newContact: known.newContact ?? null,
+        phoneNumber: known.phoneNumber ?? null,
+        state: known.state ?? null,
+        emailOnFile: known.emailOnFile ?? null,
+        preferredEmail: known.preferredEmail ?? null,
+        details: known.details ?? null,
+        raw,
       });
     });
   }
