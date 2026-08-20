@@ -6,6 +6,47 @@ import { supabaseServer } from "@/lib/supabase-server";
 // Configure this same value as KEAP_WEBHOOK_SECRET in Vercel, then set the
 // webhook URL in Keap as: https://<your-domain>/api/webhooks/keap?secret=<value>
 
+async function bumpAutomationSentCount(
+  supabase: ReturnType<typeof supabaseServer>,
+  automationName: string
+) {
+  // Ties webhook-tracked sends back into the same campaign_stats_snapshot
+  // rows that feed the All Sources / By Carrier tables, so this data shows
+  // up there automatically instead of needing a separate aggregation path.
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .select("id")
+    .eq("source", "keap")
+    .ilike("name", automationName)
+    .maybeSingle();
+  if (!campaign) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: existing } = await supabase
+    .from("campaign_stats_snapshot")
+    .select("id, sent")
+    .eq("campaign_id", campaign.id)
+    .is("step", null)
+    .is("version", null)
+    .eq("pulled_at", today)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from("campaign_stats_snapshot")
+      .update({ sent: existing.sent + 1 })
+      .eq("id", existing.id);
+  } else {
+    await supabase.from("campaign_stats_snapshot").insert({
+      campaign_id: campaign.id,
+      step: null,
+      version: null,
+      pulled_at: today,
+      sent: 1,
+    });
+  }
+}
+
 export async function POST(req: Request) {
   const url = new URL(req.url);
   const secret = url.searchParams.get("secret");
@@ -31,6 +72,10 @@ export async function POST(req: Request) {
       raw: body,
     });
     if (error) throw error;
+
+    if (String(eventType) === "email_sent" && automationName) {
+      await bumpAutomationSentCount(supabase, String(automationName));
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {

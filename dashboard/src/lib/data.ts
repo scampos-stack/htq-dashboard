@@ -47,39 +47,44 @@ export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
 }
 
 export type KeapAutomationEventVolume = {
-  date: string;
+  automationName: string;
   eventType: string;
   count: number;
 };
 
-// Populated by the /api/webhooks/keap endpoint, if Keap's automations are
-// configured to call it. Empty until that's wired up on Keap's side.
+export type EventsDateRange = { since: Date; until?: Date };
+
+// Populated by the /api/webhooks/keap endpoint — only for automations that
+// have had the HTTP-request step manually added inside Keap. Empty until
+// that's wired up per-automation on Keap's side.
 export async function getKeapAutomationEventVolume(
-  days = 30
+  range: EventsDateRange
 ): Promise<KeapAutomationEventVolume[]> {
   const supabase = supabaseServer();
-  const since = new Date();
-  since.setDate(since.getDate() - days);
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("keap_automation_events")
-    .select("event_type, occurred_at")
-    .gte("occurred_at", since.toISOString());
+    .select("event_type, automation_name, occurred_at")
+    .gte("occurred_at", range.since.toISOString());
+  if (range.until) {
+    query = query.lte("occurred_at", range.until.toISOString());
+  }
+  const { data, error } = await query;
   if (error) throw error;
 
   const counts = new Map<string, number>();
   for (const row of data ?? []) {
-    const date = row.occurred_at.slice(0, 10);
-    const key = `${date}|${row.event_type}`;
+    const name = row.automation_name ?? "(unknown automation)";
+    const key = `${name}|${row.event_type}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 
   return [...counts.entries()]
     .map(([key, count]) => {
-      const [date, eventType] = key.split("|");
-      return { date, eventType, count };
+      const [automationName, eventType] = key.split("|");
+      return { automationName, eventType, count };
     })
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
+    .sort((a, b) => b.count - a.count);
 }
 
 export type ChannelBlendAutomationStats = {
@@ -118,13 +123,14 @@ export type KeapBroadcast = {
   opens: number;
   clicks: number;
   replies: number;
+  carrier: string;
 };
 
 export async function getKeapBroadcasts(): Promise<KeapBroadcast[]> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from("keap_broadcasts")
-    .select("id, campaign_name, date_sent, emails_delivered, opens, clicks, replies")
+    .select("id, campaign_name, date_sent, emails_delivered, opens, clicks, replies, carrier")
     .order("date_sent", { ascending: false });
   if (error) throw error;
 
@@ -136,6 +142,7 @@ export async function getKeapBroadcasts(): Promise<KeapBroadcast[]> {
     opens: r.opens,
     clicks: r.clicks,
     replies: r.replies,
+    carrier: r.carrier ?? "General",
   }));
 }
 
@@ -254,7 +261,6 @@ export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
   const campaigns = (allCampaigns ?? []).filter(
     (c) => c.category !== "email_aggregate"
   );
-  if (!campaigns.length) return [];
 
   const { data: snapshots, error: snapshotsErr } = await supabase
     .from("campaign_stats_snapshot")
@@ -287,6 +293,27 @@ export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
     byCarrier.set(carrier, row);
   }
 
+  const { data: broadcasts, error: broadcastsErr } = await supabase
+    .from("keap_broadcasts")
+    .select("carrier, emails_delivered, opens, clicks");
+  if (broadcastsErr) throw broadcastsErr;
+  for (const b of broadcasts ?? []) {
+    const carrier = b.carrier ?? "General";
+    const row = byCarrier.get(carrier) ?? {
+      carrier,
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+      clicked: 0,
+    };
+    // Broadcasts only capture "delivered," not a separate sent count.
+    row.sent += b.emails_delivered;
+    row.delivered += b.emails_delivered;
+    row.opened += b.opens;
+    row.clicked += b.clicks;
+    byCarrier.set(carrier, row);
+  }
+
   return [...byCarrier.values()].sort((a, b) => b.sent - a.sent);
 }
 
@@ -295,7 +322,7 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
 
   const { data: campaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, source");
+    .select("id, source, category");
   if (campaignsErr) throw campaignsErr;
 
   const { data: snapshots, error: snapshotsErr } = await supabase
@@ -304,9 +331,7 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
     .order("pulled_at", { ascending: false });
   if (snapshotsErr) throw snapshotsErr;
 
-  const sourceByCampaign = new Map(
-    (campaigns ?? []).map((c) => [c.id, c.source])
-  );
+  const campaignById = new Map((campaigns ?? []).map((c) => [c.id, c]));
   const latestByCampaign = new Map<number, (typeof snapshots)[number]>();
   for (const row of snapshots ?? []) {
     if (!latestByCampaign.has(row.campaign_id)) {
@@ -323,19 +348,33 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
     opened: 0,
     clicked: 0,
   };
+  const keapAutomationEmails: SourceSummaryRow = {
+    key: "keap_automation_emails",
+    label: "Keap Automations (webhook-tracked, sent only)",
+    connected: false,
+    sent: 0,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+  };
+  let keapEmailsSnapshot: (typeof snapshots)[number] | undefined;
+
   for (const [campaignId, s] of latestByCampaign) {
-    if (sourceByCampaign.get(campaignId) === "woodpecker") {
+    const campaign = campaignById.get(campaignId);
+    if (!campaign) continue;
+
+    if (campaign.source === "woodpecker") {
       woodpecker.sent += s.sent;
       woodpecker.delivered += s.delivered;
       woodpecker.opened += s.opened;
       woodpecker.clicked += s.clicked;
+    } else if (campaign.source === "keap" && campaign.category === "email_aggregate") {
+      keapEmailsSnapshot = s;
+    } else if (campaign.source === "keap") {
+      keapAutomationEmails.sent += s.sent;
+      keapAutomationEmails.connected = keapAutomationEmails.connected || s.sent > 0;
     }
   }
-
-  const keapEmailsSnapshot = [...latestByCampaign.entries()].find(
-    ([campaignId, s]) =>
-      sourceByCampaign.get(campaignId) === "keap" && s.sent > 0
-  )?.[1];
 
   const keapEmails: SourceSummaryRow = {
     key: "keap_emails",
@@ -347,7 +386,27 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
     clicked: keapEmailsSnapshot?.clicked ?? 0,
   };
 
-  return [woodpecker, keapEmails];
+  const { data: broadcasts, error: broadcastsErr } = await supabase
+    .from("keap_broadcasts")
+    .select("emails_delivered, opens, clicks");
+  if (broadcastsErr) throw broadcastsErr;
+  const keapBroadcasts: SourceSummaryRow = {
+    key: "keap_broadcasts",
+    label: "Keap Broadcasts (manual entry)",
+    connected: (broadcasts ?? []).length > 0,
+    sent: 0,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+  };
+  for (const b of broadcasts ?? []) {
+    keapBroadcasts.sent += b.emails_delivered;
+    keapBroadcasts.delivered += b.emails_delivered;
+    keapBroadcasts.opened += b.opens;
+    keapBroadcasts.clicked += b.clicks;
+  }
+
+  return [woodpecker, keapEmails, keapAutomationEmails, keapBroadcasts];
 }
 
 export type KeapAutomationSummaryRow = {

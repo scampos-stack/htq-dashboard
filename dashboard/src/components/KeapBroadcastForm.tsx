@@ -3,6 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+const CARRIERS = [
+  "Independent",
+  "Farmers",
+  "State Farm",
+  "Country Financial",
+  "Liberty Mutual",
+  "AAA",
+  "Allstate",
+  "American Family",
+  "General",
+  "Blend (Multi-Carrier)",
+];
+
 const EMPTY = {
   campaignName: "",
   dateSent: "",
@@ -10,6 +23,7 @@ const EMPTY = {
   opens: "",
   clicks: "",
   replies: "",
+  carrier: "General",
 };
 
 export function KeapBroadcastForm() {
@@ -90,6 +104,20 @@ export function KeapBroadcastForm() {
             onChange={(e) => set("campaignName", e.target.value)}
             className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
           />
+        </label>
+        <label className="text-xs font-semibold text-body-gray">
+          Carrier
+          <select
+            value={form.carrier}
+            onChange={(e) => set("carrier", e.target.value)}
+            className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+          >
+            {CARRIERS.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-xs font-semibold text-body-gray">
           Date Sent

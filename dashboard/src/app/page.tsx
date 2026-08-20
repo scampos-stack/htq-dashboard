@@ -18,6 +18,7 @@ import { DashboardHeader } from "@/components/DashboardHeader";
 import { CarrierEditor } from "@/components/CarrierEditor";
 import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
 import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
+import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 
 function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING" || status === "PUBLISHED";
@@ -184,57 +185,61 @@ function KeapAutomationEventVolumeTable({
 }: {
   events: Awaited<ReturnType<typeof getKeapAutomationEventVolume>>;
 }) {
-  if (events.length === 0) {
-    return (
-      <div className="mb-6 rounded-3xl bg-white p-6 text-sm text-body-gray shadow-sm">
-        No automation events received yet. This fills in once Keap&apos;s
-        automation steps are configured to call{" "}
-        <code className="rounded bg-charcoal/5 px-1">/api/webhooks/keap</code>{" "}
-        — Keap&apos;s API has no way to pull this after the fact, so it only
-        populates going forward.
-      </div>
-    );
-  }
-
-  const byDate = new Map<string, Map<string, number>>();
+  const byAutomation = new Map<string, Map<string, number>>();
   const eventTypes = new Set<string>();
   for (const e of events) {
     eventTypes.add(e.eventType);
-    const row = byDate.get(e.date) ?? new Map();
+    const row = byAutomation.get(e.automationName) ?? new Map();
     row.set(e.eventType, e.count);
-    byDate.set(e.date, row);
+    byAutomation.set(e.automationName, row);
   }
   const types = [...eventTypes];
 
   return (
     <div className="mb-6 overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-      <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
-        Automation Event Volume (last 30 days)
-      </h3>
-      <table className="w-full min-w-[420px] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-            <th className="py-2 pr-4">Date</th>
-            {types.map((t) => (
-              <th key={t} className="py-2 pr-4">
-                {t}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {[...byDate.entries()].map(([date, row]) => (
-            <tr key={date} className="border-b border-black/5">
-              <td className="py-3 pr-4 font-semibold text-charcoal">{date}</td>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-heading text-base font-semibold text-charcoal">
+          Automation Event Volume — By Automation
+        </h3>
+        <Suspense fallback={null}>
+          <EventsRangeSelect />
+        </Suspense>
+      </div>
+
+      {events.length === 0 ? (
+        <p className="text-sm text-body-gray">
+          No automation events in this range. This fills in once Keap&apos;s
+          automation steps are configured to call{" "}
+          <code className="rounded bg-charcoal/5 px-1">/api/webhooks/keap</code>{" "}
+          — Keap&apos;s API has no way to pull this after the fact, so it only
+          populates going forward.
+        </p>
+      ) : (
+        <table className="w-full min-w-[420px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+              <th className="py-2 pr-4">Automation</th>
               {types.map((t) => (
-                <td key={t} className="py-3 pr-4">
-                  {(row.get(t) ?? 0).toLocaleString()}
-                </td>
+                <th key={t} className="py-2 pr-4">
+                  {t}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {[...byAutomation.entries()].map(([name, row]) => (
+              <tr key={name} className="border-b border-black/5">
+                <td className="py-3 pr-4 font-semibold text-charcoal">{name}</td>
+                {types.map((t) => (
+                  <td key={t} className="py-3 pr-4">
+                    {(row.get(t) ?? 0).toLocaleString()}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -525,6 +530,24 @@ export default async function Home({
     typeof params.keapStatus === "string" ? params.keapStatus : "all";
   const wpStatusParam =
     typeof params.wpStatus === "string" ? params.wpStatus : "all";
+  const eventsRangeParam =
+    typeof params.eventsRange === "string" ? params.eventsRange : "30";
+  const eventsFromParam =
+    typeof params.eventsFrom === "string" ? params.eventsFrom : "";
+  const eventsToParam =
+    typeof params.eventsTo === "string" ? params.eventsTo : "";
+
+  const eventsRange =
+    eventsRangeParam === "custom" && eventsFromParam
+      ? {
+          since: new Date(eventsFromParam),
+          until: eventsToParam ? new Date(eventsToParam) : undefined,
+        }
+      : (() => {
+          const since = new Date();
+          since.setDate(since.getDate() - Number(eventsRangeParam || "30"));
+          return { since };
+        })();
 
   const [
     allCampaigns,
@@ -546,7 +569,7 @@ export default async function Home({
     getVipSubmissions(),
     getChannelBlendSummary(),
     getChannelBlendAutomationStats(),
-    getKeapAutomationEventVolume(),
+    getKeapAutomationEventVolume(eventsRange),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
   ]);
 

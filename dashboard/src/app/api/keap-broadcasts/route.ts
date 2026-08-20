@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { campaignName, dateSent, emailsDelivered, opens, clicks, replies } = body;
+    const { campaignName, dateSent, emailsDelivered, opens, clicks, replies, carrier } = body;
 
     if (!campaignName || typeof campaignName !== "string" || !campaignName.trim()) {
       return NextResponse.json(
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
         opens: Number(opens),
         clicks: Number(clicks),
         replies: Number(replies),
+        carrier: carrier || "General",
       })
       .select()
       .single();

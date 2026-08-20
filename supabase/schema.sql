@@ -81,6 +81,7 @@ create table if not exists keap_broadcasts (
   opens            int not null default 0,
   clicks           int not null default 0,
   replies          int not null default 0,
+  carrier          text,  -- single carrier name, or 'Blend (Multi-Carrier)'
   created_at       timestamptz not null default now()
 );
 
