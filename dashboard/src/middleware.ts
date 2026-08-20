@@ -30,17 +30,18 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname.startsWith("/login");
+  const isSignupPage = request.nextUrl.pathname.startsWith("/signup");
   const isAuthCallback = request.nextUrl.pathname.startsWith("/api/auth");
   const isWebhook = request.nextUrl.pathname.startsWith("/api/webhooks/");
 
-  if (!user && !isLoginPage && !isAuthCallback && !isWebhook) {
+  if (!user && !isLoginPage && !isSignupPage && !isAuthCallback && !isWebhook) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
 
-  if (user && isLoginPage) {
+  if (user && (isLoginPage || isSignupPage)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

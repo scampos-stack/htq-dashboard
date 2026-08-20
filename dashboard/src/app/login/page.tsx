@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
@@ -95,6 +96,13 @@ function LoginForm() {
         >
           {loading ? "Signing in…" : "Sign In"}
         </button>
+
+        <p className="mt-4 text-center text-xs text-body-gray">
+          Need an account?{" "}
+          <Link href="/signup" className="font-semibold text-charcoal underline">
+            Create one
+          </Link>
+        </p>
       </form>
     </div>
   );
