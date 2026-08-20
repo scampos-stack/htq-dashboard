@@ -6,25 +6,37 @@ import { supabaseServer } from "@/lib/supabase-server";
 // Configure this same value as KEAP_WEBHOOK_SECRET in Vercel, then set the
 // webhook URL in Keap as: https://<your-domain>/api/webhooks/keap?secret=<value>
 
-async function bumpAutomationSentCount(
+// Maps our event_type values to the campaign_stats_snapshot column they bump.
+const EVENT_TO_FIELD: Record<string, "sent" | "opened" | "clicked"> = {
+  email_sent: "sent",
+  email_opened: "opened",
+  email_clicked: "clicked",
+};
+
+async function bumpAutomationEventCount(
   supabase: ReturnType<typeof supabaseServer>,
-  automationName: string
+  automationName: string,
+  field: "sent" | "opened" | "clicked"
 ) {
-  // Ties webhook-tracked sends back into the same campaign_stats_snapshot
-  // rows that feed the All Sources / By Carrier tables, so this data shows
-  // up there automatically instead of needing a separate aggregation path.
-  const { data: campaign } = await supabase
+  // Ties webhook-tracked events back into the same campaign_stats_snapshot
+  // rows that feed the All Sources / By Carrier tables. Matched with a
+  // contains-search (not an exact match) since the name typed into Keap's
+  // HTTP step body can drift slightly from the automation's real name
+  // (e.g. "Farmers Nurture" vs the real "Farmers Nurture Drip") — an exact
+  // match silently finds nothing in that case.
+  const { data: matches } = await supabase
     .from("campaigns")
-    .select("id")
+    .select("id, name")
     .eq("source", "keap")
-    .ilike("name", automationName)
-    .maybeSingle();
+    .ilike("name", `%${automationName}%`)
+    .limit(1);
+  const campaign = matches?.[0];
   if (!campaign) return;
 
   const today = new Date().toISOString().slice(0, 10);
   const { data: existing } = await supabase
     .from("campaign_stats_snapshot")
-    .select("id, sent")
+    .select(`id, ${field}`)
     .eq("campaign_id", campaign.id)
     .is("step", null)
     .is("version", null)
@@ -32,9 +44,10 @@ async function bumpAutomationSentCount(
     .maybeSingle();
 
   if (existing) {
+    const current = (existing as unknown as Record<string, number>)[field] ?? 0;
     await supabase
       .from("campaign_stats_snapshot")
-      .update({ sent: existing.sent + 1 })
+      .update({ [field]: current + 1 })
       .eq("id", existing.id);
   } else {
     await supabase.from("campaign_stats_snapshot").insert({
@@ -42,7 +55,7 @@ async function bumpAutomationSentCount(
       step: null,
       version: null,
       pulled_at: today,
-      sent: 1,
+      [field]: 1,
     });
   }
 }
@@ -73,8 +86,9 @@ export async function POST(req: Request) {
     });
     if (error) throw error;
 
-    if (String(eventType) === "email_sent" && automationName) {
-      await bumpAutomationSentCount(supabase, String(automationName));
+    const field = EVENT_TO_FIELD[String(eventType)];
+    if (field && automationName) {
+      await bumpAutomationEventCount(supabase, String(automationName), field);
     }
 
     return NextResponse.json({ ok: true });
