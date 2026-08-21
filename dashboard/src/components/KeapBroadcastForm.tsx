@@ -16,7 +16,17 @@ const CARRIERS = [
   "Blend (Multi-Carrier)",
 ];
 
-const EMPTY = {
+export type BroadcastFormValues = {
+  campaignName: string;
+  dateSent: string;
+  emailsDelivered: string;
+  opens: string;
+  clicks: string;
+  replies: string;
+  carrier: string;
+};
+
+const EMPTY: BroadcastFormValues = {
   campaignName: "",
   dateSent: "",
   emailsDelivered: "",
@@ -26,13 +36,24 @@ const EMPTY = {
   carrier: "General",
 };
 
-export function KeapBroadcastForm() {
+export function KeapBroadcastForm({
+  broadcastId,
+  initialValues,
+  onDone,
+  onCancel,
+}: {
+  broadcastId?: number;
+  initialValues?: BroadcastFormValues;
+  onDone?: () => void;
+  onCancel?: () => void;
+}) {
   const router = useRouter();
-  const [form, setForm] = useState(EMPTY);
+  const isEdit = broadcastId != null;
+  const [form, setForm] = useState<BroadcastFormValues>(initialValues ?? EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  function set<K extends keyof typeof EMPTY>(key: K, value: string) {
+  function set<K extends keyof BroadcastFormValues>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -62,17 +83,21 @@ export function KeapBroadcastForm() {
     setError(null);
     setSaving(true);
     try {
-      const res = await fetch("/api/keap-broadcasts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const res = await fetch(
+        isEdit ? `/api/keap-broadcasts/${broadcastId}` : "/api/keap-broadcasts",
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        }
+      );
       const data = await res.json();
       if (!res.ok || !data.ok) {
         throw new Error(data.error ?? "Failed to save broadcast");
       }
-      setForm(EMPTY);
+      if (!isEdit) setForm(EMPTY);
       router.refresh();
+      onDone?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save broadcast");
     } finally {
@@ -83,11 +108,13 @@ export function KeapBroadcastForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mb-6 rounded-3xl bg-white p-6 shadow-sm"
+      className={isEdit ? "" : "mb-6 rounded-3xl bg-white p-6 shadow-sm"}
     >
-      <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
-        Log a Broadcast
-      </h3>
+      {!isEdit && (
+        <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+          Log a Broadcast
+        </h3>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -170,13 +197,24 @@ export function KeapBroadcastForm() {
         </label>
       </div>
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="mt-4 rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
-      >
-        {saving ? "Saving…" : "Add Broadcast"}
-      </button>
+      <div className="mt-4 flex gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
+        >
+          {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Broadcast"}
+        </button>
+        {isEdit && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full px-4 py-2 text-sm font-semibold text-body-gray"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }

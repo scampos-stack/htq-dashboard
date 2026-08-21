@@ -19,6 +19,8 @@ import { CarrierEditor } from "@/components/CarrierEditor";
 import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
 import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
+import { BroadcastCard } from "@/components/BroadcastCard";
+import { DispositionRow } from "@/components/DispositionRow";
 
 function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING" || status === "PUBLISHED";
@@ -334,33 +336,7 @@ function KeapBroadcastsList({
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           {broadcasts.map((b) => (
-            <div
-              key={b.id}
-              className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm"
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <h3 className="font-heading text-lg font-semibold text-charcoal">
-                  {b.campaignName}
-                </h3>
-                <span className="text-xs text-body-gray">
-                  {new Date(b.dateSent + "T00:00:00").toLocaleDateString()}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <Metric label="Delivered" value={b.emailsDelivered.toLocaleString()} />
-                <Metric label="Opens" value={b.opens.toLocaleString()} />
-                <Metric label="Clicks" value={b.clicks.toLocaleString()} />
-                <Metric label="Replies" value={b.replies.toLocaleString()} />
-                <Metric
-                  label="Open rate"
-                  value={pct(b.opens, b.emailsDelivered)}
-                />
-                <Metric
-                  label="CTR"
-                  value={pct(b.clicks, b.emailsDelivered)}
-                />
-              </div>
-            </div>
+            <BroadcastCard key={b.id} broadcast={b} />
           ))}
         </div>
       )}
@@ -463,18 +439,12 @@ function ChannelBlendSection({
                 <th className="py-2 pr-4">Lead</th>
                 <th className="py-2 pr-4">State</th>
                 <th className="py-2 pr-4">Details</th>
+                <th className="py-2 pr-4">Actions</th>
               </tr>
             </thead>
             <tbody>
               {summary.recent.map((r) => (
-                <tr key={r.id} className="border-b border-black/5">
-                  <td className="py-3 pr-4 font-semibold text-charcoal">{r.category}</td>
-                  <td className="py-3 pr-4">{r.leadName ?? "—"}</td>
-                  <td className="py-3 pr-4">{r.state ?? "—"}</td>
-                  <td className="py-3 pr-4 max-w-xs truncate" title={r.details ?? ""}>
-                    {r.details ?? "—"}
-                  </td>
-                </tr>
+                <DispositionRow key={r.id} row={r} />
               ))}
             </tbody>
           </table>
