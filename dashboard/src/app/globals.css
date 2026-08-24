@@ -29,3 +29,53 @@ body {
   background: var(--mist);
   color: var(--foreground);
 }
+
+/* Dark mode — retrofit via class overrides on the utility classes already
+   in use everywhere (bg-white cards, text-charcoal, etc.) rather than
+   touching every component file. Toggled by ThemeToggle adding/removing
+   `dark` on <html>. */
+:root.dark {
+  --mist: #121212;
+  --foreground: #f2f2f0;
+  --body-gray: #a8a8a5;
+}
+
+.dark .bg-white {
+  background-color: #1c1c1c !important;
+}
+.dark .text-charcoal {
+  color: #f2f2f0 !important;
+}
+.dark .text-body-gray {
+  color: #a8a8a5 !important;
+}
+.dark .border-black\/5 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.dark .border-black\/10 {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+.dark .bg-charcoal\/10 {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+.dark .bg-charcoal\/5 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+.dark .bg-brand-green\/15 {
+  background-color: rgba(124, 179, 66, 0.28) !important;
+}
+.dark .shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+}
+.dark .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+.dark .text-red-700 {
+  color: #fca5a5 !important;
+}
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1c1c1c;
+  color: #f2f2f0;
+}

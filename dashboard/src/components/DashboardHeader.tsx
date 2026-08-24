@@ -1,6 +1,7 @@
 import { TopTabs } from "@/components/TopTabs";
 import { SyncButton } from "@/components/SyncButton";
 import { SignOutButton } from "@/components/SignOutButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function DashboardHeader({
   active,
@@ -25,7 +26,10 @@ export function DashboardHeader({
         </div>
 
         <div className="flex flex-col items-center gap-2 sm:items-end">
-          <SyncButton />
+          <div className="flex items-center gap-2">
+            <SyncButton />
+            <ThemeToggle />
+          </div>
           <SignOutButton />
         </div>
       </div>
