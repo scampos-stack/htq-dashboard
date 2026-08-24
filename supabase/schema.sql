@@ -11,6 +11,8 @@ create table if not exists campaigns (
   status       text,                       -- e.g. RUNNING, PAUSED, COMPLETED
   category     text,                       -- e.g. 'nurture' vs 'lead_gen' for Keap automations
   carrier      text,                       -- e.g. 'Independent', 'Farmers', 'State Farm'
+  email_copy   jsonb,                      -- [{subject, msg}, ...] captured from Woodpecker steps
+  exclude_from_metrics boolean not null default false, -- e.g. HTQ University in conversion rollups
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   unique (source, external_id)

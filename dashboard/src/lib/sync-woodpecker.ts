@@ -36,6 +36,7 @@ type WoodpeckerCampaignDetail = WoodpeckerCampaign & {
     interested: number;
     maybe_later: number;
     not_interested: number;
+    emails?: { subject?: string; msg?: string }[];
   };
 };
 
@@ -93,6 +94,17 @@ export async function syncWoodpecker(): Promise<{
       interested_maybe: s.maybe_later ?? null,
       interested_no: s.not_interested ?? null,
     });
+
+    const campaignId = campaignIdByExternalId.get(String(c.id));
+    const emailCopy = (s.emails ?? [])
+      .filter((e) => e.subject || e.msg)
+      .map((e) => ({ subject: e.subject ?? null, msg: e.msg ?? null }));
+    if (campaignId && emailCopy.length > 0) {
+      await supabase
+        .from("campaigns")
+        .update({ email_copy: emailCopy })
+        .eq("id", campaignId);
+    }
   }
 
   const { error: snapshotErr } = await supabase

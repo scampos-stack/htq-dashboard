@@ -6,17 +6,28 @@ import { supabaseServer } from "@/lib/supabase-server";
 // Configure this same value as KEAP_WEBHOOK_SECRET in Vercel, then set the
 // webhook URL in Keap as: https://<your-domain>/api/webhooks/keap?secret=<value>
 
-// Maps our event_type values to the campaign_stats_snapshot column they bump.
-const EVENT_TO_FIELD: Record<string, "sent" | "opened" | "clicked"> = {
-  email_sent: "sent",
-  email_opened: "opened",
-  email_clicked: "clicked",
-};
+// Classifies an event_type string to the campaign_stats_snapshot column it
+// bumps. Prefix/contains matched (not exact) so named sub-types — e.g.
+// "link_clicked_calendar" vs "link_clicked_vip_form" for tracking Paula's
+// Calendar vs the VIP Form separately — still roll up into the same
+// "clicked" total while remaining distinct rows in keap_automation_events
+// (the Automation Event Volume table groups by the literal event_type, so
+// each sub-type still gets its own column there).
+type StatField = "sent" | "opened" | "clicked" | "opt_out";
+
+function classifyEventType(eventType: string): StatField | null {
+  const t = eventType.toLowerCase();
+  if (t.includes("unsubscri") || t.includes("opt_out") || t.includes("optout")) return "opt_out";
+  if (t.includes("click")) return "clicked";
+  if (t.includes("open")) return "opened";
+  if (t.includes("sent")) return "sent";
+  return null;
+}
 
 async function bumpAutomationEventCount(
   supabase: ReturnType<typeof supabaseServer>,
   automationName: string,
-  field: "sent" | "opened" | "clicked"
+  field: StatField
 ) {
   // Ties webhook-tracked events back into the same campaign_stats_snapshot
   // rows that feed the All Sources / By Carrier tables. Matched with a
@@ -86,7 +97,7 @@ export async function POST(req: Request) {
     });
     if (error) throw error;
 
-    const field = EVENT_TO_FIELD[String(eventType)];
+    const field = classifyEventType(String(eventType));
     if (field && automationName) {
       await bumpAutomationEventCount(supabase, String(automationName), field);
     }

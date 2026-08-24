@@ -203,6 +203,7 @@ export type VipSubmission = {
   name: string;
   email: string | null;
   dateApplied: string;
+  formDetails: string;
 };
 
 export async function getVipSubmissions(): Promise<VipSubmission[]> {
@@ -211,7 +212,7 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
 
   const VIP_TAG_ID = 16422;
   const res = await fetch(
-    `https://api.infusionsoft.com/crm/rest/v1/tags/${VIP_TAG_ID}/contacts?limit=50&order=date_applied&order_direction=DESCENDING`,
+    `https://api.infusionsoft.com/crm/rest/v1/tags/${VIP_TAG_ID}/contacts?limit=10&order=date_applied&order_direction=DESCENDING`,
     { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" }
   );
   if (!res.ok) return [];
@@ -221,12 +222,44 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
     contact: { id: number; email?: string; first_name?: string; last_name?: string };
     date_applied: string;
   };
-  return ((data.contacts ?? []) as VipRow[]).map((row) => ({
-    contactId: row.contact.id,
-    name: [row.contact.first_name, row.contact.last_name].filter(Boolean).join(" ") || "(no name)",
-    email: row.contact.email ?? null,
-    dateApplied: row.date_applied,
-  }));
+  const rows = (data.contacts ?? []) as VipRow[];
+
+  // The tag/contacts list doesn't include phone/company — fetch the full
+  // record per contact for "Form Details". Small, fixed-size list (top 10),
+  // so the extra calls are cheap.
+  const submissions = await Promise.all(
+    rows.map(async (row) => {
+      let formDetails = "—";
+      try {
+        const detailRes = await fetch(
+          `https://api.infusionsoft.com/crm/rest/v1/contacts/${row.contact.id}`,
+          { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" }
+        );
+        if (detailRes.ok) {
+          const detail = await detailRes.json();
+          const phone = detail.phone_numbers?.[0]?.number;
+          const company = detail.company?.company_name;
+          formDetails = [phone && `Phone: ${phone}`, company && `Company: ${company}`]
+            .filter(Boolean)
+            .join(" · ") || "—";
+        }
+      } catch {
+        // leave as "—" — this is a nice-to-have enrichment, not core data
+      }
+
+      return {
+        contactId: row.contact.id,
+        name:
+          [row.contact.first_name, row.contact.last_name].filter(Boolean).join(" ") ||
+          "(no name)",
+        email: row.contact.email ?? null,
+        dateApplied: row.date_applied,
+        formDetails,
+      };
+    })
+  );
+
+  return submissions;
 }
 
 export type CampaignWithStats = {
@@ -248,6 +281,7 @@ export type CampaignWithStats = {
     responded_rate: number | null;
     interested_yes: number | null;
     interested_maybe: number | null;
+    interested_no: number | null;
     pulled_at: string;
   } | null;
 };
@@ -306,12 +340,12 @@ export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
 
   const { data: allCampaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, carrier, category");
+    .select("id, carrier, category, exclude_from_metrics");
   if (campaignsErr) throw campaignsErr;
   // Filtered in JS, not SQL — a `.neq()` on a nullable column silently drops
   // every row where category IS NULL (Woodpecker campaigns never set it).
   const campaigns = (allCampaigns ?? []).filter(
-    (c) => c.category !== "email_aggregate"
+    (c) => c.category !== "email_aggregate" && !c.exclude_from_metrics
   );
 
   const { data: snapshots, error: snapshotsErr } = await supabase
@@ -374,7 +408,7 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
 
   const { data: campaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, source, category");
+    .select("id, source, category, exclude_from_metrics");
   if (campaignsErr) throw campaignsErr;
 
   const { data: snapshots, error: snapshotsErr } = await supabase
@@ -413,7 +447,7 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
 
   for (const [campaignId, s] of latestByCampaign) {
     const campaign = campaignById.get(campaignId);
-    if (!campaign) continue;
+    if (!campaign || campaign.exclude_from_metrics) continue;
 
     if (campaign.source === "woodpecker") {
       woodpecker.sent += s.sent;
@@ -528,6 +562,7 @@ export type KeapAutomation = {
   status: string | null;
   category: string;
   carrier: string | null;
+  excludeFromMetrics: boolean;
   activeContacts: number;
   completedContacts: number;
 };
@@ -537,7 +572,7 @@ export async function getKeapAutomations(): Promise<KeapAutomation[]> {
 
   const { data: campaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, name, status, category, carrier")
+    .select("id, name, status, category, carrier, exclude_from_metrics")
     .eq("source", "keap")
     .neq("category", "email_aggregate")
     .order("name");
@@ -565,6 +600,7 @@ export async function getKeapAutomations(): Promise<KeapAutomation[]> {
       status: c.status,
       category: c.category ?? "uncategorized",
       carrier: c.carrier,
+      excludeFromMetrics: c.exclude_from_metrics ?? false,
       activeContacts: s?.active_contacts ?? 0,
       completedContacts: s?.completed_contacts ?? 0,
     };
@@ -585,7 +621,7 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
   const { data: snapshots, error: snapshotsErr } = await supabase
     .from("campaign_stats_snapshot")
     .select(
-      "campaign_id, sent, delivered, opened, opened_rate, clicked, bounced, bounce_rate, responded, responded_rate, interested_yes, interested_maybe, pulled_at"
+      "campaign_id, sent, delivered, opened, opened_rate, clicked, bounced, bounce_rate, responded, responded_rate, interested_yes, interested_maybe, interested_no, pulled_at"
     )
     .order("pulled_at", { ascending: false });
   if (snapshotsErr) throw snapshotsErr;
@@ -614,6 +650,7 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
             responded_rate: s.responded_rate,
             interested_yes: s.interested_yes,
             interested_maybe: s.interested_maybe,
+            interested_no: s.interested_no,
             pulled_at: s.pulled_at,
           }
         : null,

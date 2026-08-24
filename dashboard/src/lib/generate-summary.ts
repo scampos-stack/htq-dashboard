@@ -15,14 +15,22 @@ type CampaignDigest = {
   interestedYes: number | null;
   interestedMaybe: number | null;
   interestedNo: number | null;
+  emailCopy: { subject: string | null; msg: string | null }[] | null;
 };
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 async function getWoodpeckerDigest(): Promise<CampaignDigest[]> {
   const supabase = supabaseServer();
 
   const { data: campaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, name, status")
+    .select("id, name, status, email_copy")
     .eq("source", "woodpecker");
   if (campaignsErr) throw campaignsErr;
   if (!campaigns?.length) return [];
@@ -44,6 +52,7 @@ async function getWoodpeckerDigest(): Promise<CampaignDigest[]> {
 
   return campaigns.map((c) => {
     const s = latestByCampaign.get(c.id);
+    const rawCopy = (c.email_copy ?? []) as { subject: string | null; msg: string | null }[];
     return {
       name: c.name,
       status: c.status,
@@ -58,6 +67,12 @@ async function getWoodpeckerDigest(): Promise<CampaignDigest[]> {
       interestedYes: s?.interested_yes ?? null,
       interestedMaybe: s?.interested_maybe ?? null,
       interestedNo: s?.interested_no ?? null,
+      emailCopy: rawCopy.length
+        ? rawCopy.map((e) => ({
+            subject: e.subject,
+            msg: e.msg ? stripHtml(e.msg).slice(0, 800) : null,
+          }))
+        : null,
     };
   });
 }
@@ -83,15 +98,24 @@ export async function generateWoodpeckerExecutiveSummary(): Promise<{
     max_tokens: 1024,
     system:
       "You write short executive summaries for a marketing dashboard. " +
-      "Ground every statement strictly in the numbers provided — never speculate, " +
-      "estimate, or invent figures not present in the data. If the data is too thin " +
-      "for a meaningful summary, say so plainly. Plain language, 3-5 sentences, " +
-      "no headers or bullet points, suitable for a busy executive skimming a dashboard.",
+      "Ground every statement strictly in the numbers and email copy provided — " +
+      "never speculate, estimate, or invent figures or claims not present in the " +
+      "data. If the data is too thin for a meaningful summary, say so plainly. " +
+      "\n\nWrite exactly two parts, plain language, no headers or markdown:\n" +
+      "1. A 2-3 sentence overview naming the top-performing and " +
+      "underperforming campaigns by name, citing their actual open/click/reply " +
+      "numbers.\n" +
+      "2. One or two actionable recommendations for improving the underperforming " +
+      "campaign's email copy — reference specific wording from the provided " +
+      "email_copy field, not generic advice. If email_copy isn't available for the " +
+      "underperforming campaign, say recommendations aren't possible without it " +
+      "rather than guessing.",
     messages: [
       {
         role: "user",
         content:
-          "Here is the current Woodpecker campaign data (JSON). Write the executive summary:\n\n" +
+          "Here is the current Woodpecker campaign data, including email copy " +
+          "where available (JSON). Write the executive summary:\n\n" +
           JSON.stringify(digest, null, 2),
       },
     ],

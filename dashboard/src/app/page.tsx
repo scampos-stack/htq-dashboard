@@ -18,6 +18,7 @@ import { SourceNav } from "@/components/SourceNav";
 import { StatusFilter } from "@/components/StatusFilter";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { CarrierEditor } from "@/components/CarrierEditor";
+import { AutomationGoalEditor } from "@/components/AutomationGoalEditor";
 import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
 import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
@@ -291,19 +292,39 @@ function KeapAutomationsList({
                   <th className="py-2 pr-4">Automation</th>
                   <th className="py-2 pr-4">Has Email</th>
                   <th className="py-2 pr-4">Carrier</th>
+                  <th className="py-2 pr-4">Goal</th>
                   <th className="py-2 pr-4">Active Contacts</th>
                   <th className="py-2 pr-4">Completed Contacts</th>
                 </tr>
               </thead>
               <tbody>
                 {list.map((a) => (
-                  <tr key={a.id} className="border-b border-black/5">
-                    <td className="py-3 pr-4 font-semibold text-charcoal">{a.name}</td>
+                  <tr
+                    key={a.id}
+                    className={`border-b border-black/5 ${
+                      a.excludeFromMetrics ? "opacity-60" : ""
+                    }`}
+                  >
+                    <td className="py-3 pr-4 font-semibold text-charcoal">
+                      {a.name}
+                      {a.excludeFromMetrics && (
+                        <span className="ml-2 rounded-full bg-charcoal/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-body-gray">
+                          Excluded
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3 pr-4">
                       <StatusPill status={a.status} />
                     </td>
                     <td className="py-3 pr-4">
                       <CarrierEditor campaignId={a.id} carrier={a.carrier} />
+                    </td>
+                    <td className="py-3 pr-4">
+                      <AutomationGoalEditor
+                        campaignId={a.id}
+                        category={a.category}
+                        excludeFromMetrics={a.excludeFromMetrics}
+                      />
                     </td>
                     <td className="py-3 pr-4">{a.activeContacts.toLocaleString()}</td>
                     <td className="py-3 pr-4">{a.completedContacts.toLocaleString()}</td>
@@ -315,10 +336,14 @@ function KeapAutomationsList({
         </div>
       ))}
       <p className="text-xs text-body-gray">
-        Category is a first-pass keyword guess (no native field from Keap) —
-        review and correct as needed. &quot;Has Email&quot; reflects whether the
-        automation is published (actively sending), not per-email open/click
-        stats — Keap&apos;s API doesn&apos;t expose those for automations.
+        Category/Goal is a first-pass keyword guess (no native field from
+        Keap) — review and correct as needed. &quot;Has Email&quot; reflects
+        whether the automation is published (actively sending), not
+        per-email open/click stats — Keap&apos;s API doesn&apos;t expose
+        those for automations. Automations marked &quot;Exclude from
+        conversion metrics&quot; are left out of the By Carrier and All
+        Sources rollups (e.g. HTQ University, which isn&apos;t a
+        conversion-focused automation).
       </p>
     </div>
   );
@@ -474,6 +499,7 @@ function VipSubmissionsWidget({
               <th className="py-2 pr-4">Submission Date</th>
               <th className="py-2 pr-4">Contact Name</th>
               <th className="py-2 pr-4">Email</th>
+              <th className="py-2 pr-4">Form Details</th>
             </tr>
           </thead>
           <tbody>
@@ -484,6 +510,7 @@ function VipSubmissionsWidget({
                 </td>
                 <td className="py-3 pr-4 font-semibold text-charcoal">{s.name}</td>
                 <td className="py-3 pr-4">{s.email ?? "—"}</td>
+                <td className="py-3 pr-4 text-body-gray">{s.formDetails}</td>
               </tr>
             ))}
           </tbody>
@@ -724,14 +751,26 @@ export default async function Home({
                                 : "—"
                             }
                           />
-                          <Metric
-                            label="Responded"
-                            value={
-                              rangeStats
-                                ? "—"
-                                : (c.stats?.responded ?? 0).toLocaleString()
-                            }
-                          />
+                          {rangeStats ? (
+                            <Metric label="Responded" value="—" />
+                          ) : (
+                            <div className="flex flex-col">
+                              <span className="flex items-center gap-2 text-sm font-bold text-charcoal font-heading">
+                                <span className="text-[#0ca30c]">
+                                  {(c.stats?.interested_yes ?? 0).toLocaleString()}
+                                </span>
+                                <span className="text-[#fab219]">
+                                  {(c.stats?.interested_maybe ?? 0).toLocaleString()}
+                                </span>
+                                <span className="text-[#d03b3b]">
+                                  {(c.stats?.interested_no ?? 0).toLocaleString()}
+                                </span>
+                              </span>
+                              <span className="text-xs uppercase tracking-wide text-body-gray">
+                                Pos / Neu / Neg
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {c.stats && !rangeStats && (
