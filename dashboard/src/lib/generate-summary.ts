@@ -154,32 +154,33 @@ export async function generateWoodpeckerExecutiveSummary(): Promise<{
   return { generated: true };
 }
 
-type FeedbackEntry = {
+type ChannelBlendEntry = {
+  category: string;
   leadName: string | null;
   state: string | null;
   details: string | null;
 };
 
-async function getChannelBlendFeedbackDigest(): Promise<FeedbackEntry[]> {
+async function getChannelBlendDigest(): Promise<ChannelBlendEntry[]> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from("channel_blend_dispositions")
-    .select("lead_name, state, details")
-    .ilike("category", "feedback")
+    .select("category, lead_name, state, details")
     .not("details", "is", null);
   if (error) throw error;
 
   return (data ?? []).map((r) => ({
+    category: r.category,
     leadName: r.lead_name,
     state: r.state,
     details: r.details,
   }));
 }
 
-// Regenerated after each Channel Blend upload that touches the "Feedback"
-// category — there's no scheduled sync for manually-uploaded data, so the
-// upload itself is the trigger point (see /api/channel-blend/upload).
-export async function generateChannelBlendFeedbackSummary(): Promise<{
+// Regenerated after every Channel Blend upload that adds rows — there's no
+// scheduled sync for manually-uploaded data, so the upload itself is the
+// trigger point (see /api/channel-blend/upload).
+export async function generateChannelBlendPatternsSummary(): Promise<{
   generated: boolean;
   reason?: string;
 }> {
@@ -188,33 +189,42 @@ export async function generateChannelBlendFeedbackSummary(): Promise<{
     return { generated: false, reason: "ANTHROPIC_API_KEY not configured" };
   }
 
-  const digest = await getChannelBlendFeedbackDigest();
+  const digest = await getChannelBlendDigest();
   if (digest.length === 0) {
-    return { generated: false, reason: "No Feedback entries yet" };
+    return { generated: false, reason: "No Channel Blend entries with details yet" };
   }
 
   const client = new Anthropic({ apiKey });
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 1024,
+    max_tokens: 2048,
     system:
       "You analyze call disposition notes from a lead-generation outreach " +
-      "team's \"Feedback\" category and surface the most common reasons " +
-      "contacts gave. Ground every theme strictly in the details text " +
-      "provided — never invent reasons or counts not supported by the data." +
-      "\n\nOutput a numbered list of the top 5 recurring themes, ranked by " +
-      "frequency, plain language, no markdown headers or bold. For each: a " +
-      "short theme title, the count of entries matching it, and one " +
+      "team's Channel Blend spreadsheet. Each entry has a category (e.g. " +
+      "Appointments, Email Requests, Feedback) and a free-text \"details\" " +
+      "note describing what happened on that call. Ground every pattern " +
+      "strictly in the details text provided — never invent reasons or " +
+      "counts not supported by the data.\n\n" +
+      "For EACH distinct category present in the data, output one compact " +
+      "section:\n" +
+      "- A line with just the category name.\n" +
+      "- The top 3 most common recurring patterns in that category's " +
+      "details, each as a short bullet: a plain-language label for the " +
+      "pattern, the approximate count of entries matching it, and one " +
       "representative example quoted or closely paraphrased from the " +
-      "details. If fewer than 5 distinct themes exist, list only as many as " +
-      "are genuinely distinct.",
+      "details.\n" +
+      "If a category has fewer than 3 genuinely distinct patterns, list " +
+      "only as many as are real — don't pad to 3. Keep every bullet to one " +
+      "line, easy to scan at a glance. Plain text only — no markdown " +
+      "headers, no bold, no nested sub-bullets.",
     messages: [
       {
         role: "user",
         content:
-          "Here are the Feedback disposition entries (JSON). Identify the " +
-          "top 5 recurring feedback themes:\n\n" + JSON.stringify(digest, null, 2),
+          "Here are the Channel Blend disposition entries (JSON), each " +
+          "tagged with its category. Identify the top 3 recurring patterns " +
+          "per category:\n\n" + JSON.stringify(digest, null, 2),
       },
     ],
   });
@@ -224,13 +234,21 @@ export async function generateChannelBlendFeedbackSummary(): Promise<{
   );
   const summary = textBlock?.text?.trim();
   if (!summary) {
-    return { generated: false, reason: "Claude returned no text content" };
+    console.error(
+      "[channel-blend patterns] no text content, stop_reason:",
+      response.stop_reason,
+      JSON.stringify(response.content)
+    );
+    return {
+      generated: false,
+      reason: `Claude returned no text content (stop_reason: ${response.stop_reason})`,
+    };
   }
 
   const supabase = supabaseServer();
   const { error } = await supabase.from("ai_summaries").upsert(
     {
-      scope: "channel_blend_feedback",
+      scope: "channel_blend_patterns",
       summary,
       generated_at: new Date().toISOString(),
     },

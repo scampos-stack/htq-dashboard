@@ -2,12 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { ChannelBlendFeedbackSummary } from "@/lib/data";
+import type { ChannelBlendPatternsSummary } from "@/lib/data";
 
-export function ChannelBlendFeedbackCard({
+export function ChannelBlendPatternsCard({
   summary,
 }: {
-  summary: ChannelBlendFeedbackSummary;
+  summary: ChannelBlendPatternsSummary;
 }) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -17,7 +17,7 @@ export function ChannelBlendFeedbackCard({
     setGenerating(true);
     setError(null);
     try {
-      const res = await fetch("/api/channel-blend/feedback-summary", { method: "POST" });
+      const res = await fetch("/api/channel-blend/patterns-summary", { method: "POST" });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to generate summary");
       router.refresh();
@@ -43,12 +43,12 @@ export function ChannelBlendFeedbackCard({
       <div className="mb-6 rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
         <div className="mb-1 flex items-center justify-between gap-3">
           <h3 className="font-heading text-base font-semibold text-charcoal">
-            Top Feedback (AI Summary)
+            Recurring Patterns (AI Summary)
           </h3>
           {regenerateButton}
         </div>
         <p className="text-sm text-body-gray">
-          No summary yet — upload a Feedback disposition file, or click Regenerate.
+          No summary yet — upload a disposition file, or click Regenerate.
         </p>
         {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       </div>
@@ -59,7 +59,7 @@ export function ChannelBlendFeedbackCard({
     <div className="mb-6 rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h3 className="font-heading text-base font-semibold text-charcoal">
-          Top Feedback (AI Summary)
+          Recurring Patterns (AI Summary)
         </h3>
         <div className="flex items-center gap-3">
           <span className="text-xs text-body-gray">

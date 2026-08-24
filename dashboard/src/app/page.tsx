@@ -10,7 +10,7 @@ import {
   getChannelBlendSummary,
   getChannelBlendAutomationStats,
   getChannelBlendUploads,
-  getChannelBlendFeedbackSummary,
+  getChannelBlendPatternsSummary,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
@@ -24,7 +24,7 @@ import { AutomationGoalEditor } from "@/components/AutomationGoalEditor";
 import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
 import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistory";
-import { ChannelBlendFeedbackCard } from "@/components/ChannelBlendFeedbackCard";
+import { ChannelBlendPatternsCard } from "@/components/ChannelBlendPatternsCard";
 import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable";
 import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { CampaignEmailContent } from "@/components/CampaignEmailContent";
@@ -385,12 +385,12 @@ function ChannelBlendSection({
   summary,
   automationStats,
   uploads,
-  feedbackSummary,
+  patternsSummary,
 }: {
   summary: Awaited<ReturnType<typeof getChannelBlendSummary>>;
   automationStats: Awaited<ReturnType<typeof getChannelBlendAutomationStats>>;
   uploads: Awaited<ReturnType<typeof getChannelBlendUploads>>;
-  feedbackSummary: Awaited<ReturnType<typeof getChannelBlendFeedbackSummary>>;
+  patternsSummary: Awaited<ReturnType<typeof getChannelBlendPatternsSummary>>;
 }) {
   return (
     <div>
@@ -398,7 +398,7 @@ function ChannelBlendSection({
 
       <ChannelBlendUploadHistory uploads={uploads} />
 
-      <ChannelBlendFeedbackCard summary={feedbackSummary} />
+      <ChannelBlendPatternsCard summary={patternsSummary} />
 
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
@@ -595,7 +595,7 @@ export default async function Home({
     channelBlendSummary,
     channelBlendAutomationStats,
     channelBlendUploads,
-    channelBlendFeedbackSummary,
+    channelBlendPatternsSummary,
     keapAutomationEvents,
     woodpeckerAiSummary,
     woodpeckerSentiment,
@@ -610,7 +610,7 @@ export default async function Home({
     getChannelBlendSummary(),
     getChannelBlendAutomationStats(),
     getChannelBlendUploads(),
-    getChannelBlendFeedbackSummary(),
+    getChannelBlendPatternsSummary(),
     getKeapAutomationEventVolume(eventsRange),
     getWoodpeckerAiSummary(),
     getWoodpeckerSentiment(),
@@ -698,7 +698,7 @@ export default async function Home({
                 summary={channelBlendSummary}
                 automationStats={channelBlendAutomationStats}
                 uploads={channelBlendUploads}
-                feedbackSummary={channelBlendFeedbackSummary}
+                patternsSummary={channelBlendPatternsSummary}
               />
             </SectionBlock>
           )}

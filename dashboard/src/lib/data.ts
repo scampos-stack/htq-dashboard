@@ -117,17 +117,17 @@ export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
   };
 }
 
-export type ChannelBlendFeedbackSummary = {
+export type ChannelBlendPatternsSummary = {
   summary: string;
   generatedAt: string;
 } | null;
 
-export async function getChannelBlendFeedbackSummary(): Promise<ChannelBlendFeedbackSummary> {
+export async function getChannelBlendPatternsSummary(): Promise<ChannelBlendPatternsSummary> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from("ai_summaries")
     .select("summary, generated_at")
-    .eq("scope", "channel_blend_feedback")
+    .eq("scope", "channel_blend_patterns")
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;

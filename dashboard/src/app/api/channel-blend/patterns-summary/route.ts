@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { generateChannelBlendFeedbackSummary } from "@/lib/generate-summary";
+import { generateChannelBlendPatternsSummary } from "@/lib/generate-summary";
 
-// Manual trigger for the "Top Feedback (AI Summary)" card — the automatic
-// path only regenerates on an upload that adds new Feedback rows, so this
+// Manual trigger for the "Recurring Patterns (AI Summary)" card — the
+// automatic path only regenerates on an upload that adds new rows, so this
 // covers existing data uploaded before that trigger existed, or just
 // picking up a newly-configured ANTHROPIC_API_KEY.
 export async function POST() {
   try {
-    const result = await generateChannelBlendFeedbackSummary();
+    const result = await generateChannelBlendPatternsSummary();
     if (!result.generated) {
       return NextResponse.json(
         { ok: false, error: result.reason ?? "Summary not generated" },
