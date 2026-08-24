@@ -12,7 +12,8 @@ async function wpFetch(path: string) {
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Woodpecker API ${path} -> ${res.status} ${res.statusText}`);
+    const body = await res.text().catch(() => "");
+    throw new Error(`Woodpecker API ${path} -> ${res.status} ${res.statusText}${body ? `: ${body}` : ""}`);
   }
   return res.json();
 }
@@ -31,7 +32,8 @@ async function wpFetchV2(path: string, init?: RequestInit) {
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Woodpecker API v2 ${path} -> ${res.status} ${res.statusText}`);
+    const body = await res.text().catch(() => "");
+    throw new Error(`Woodpecker API v2 ${path} -> ${res.status} ${res.statusText}${body ? `: ${body}` : ""}`);
   }
   return res.json();
 }
