@@ -736,7 +736,7 @@ export default async function Home({
                   data.
                 </p>
               ) : (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div className="flex flex-col gap-4">
                   {campaigns.map((c) => {
                     const rangeStats = rangeTotals?.get(c.id);
                     const sent = rangeStats ? rangeStats.sent : c.stats?.sent ?? 0;
@@ -757,17 +757,15 @@ export default async function Home({
                         key={c.id}
                         className="rounded-3xl border-l-4 border-brand-green bg-white p-6 shadow-sm"
                       >
-                        <div className="mb-2 flex items-start justify-between gap-3">
+                        <div className="mb-4 flex flex-wrap items-center gap-3">
                           <h3 className="font-heading text-lg font-semibold text-charcoal">
                             {c.name}
                           </h3>
                           <StatusPill status={c.status} />
-                        </div>
-                        <div className="mb-4">
                           <CarrierEditor campaignId={c.id} carrier={c.carrier} />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="flex flex-wrap gap-x-8 gap-y-4">
                           <Metric label="Sent" value={sent.toLocaleString()} />
                           <Metric label="Open rate" value={openRate} />
                           <Metric
@@ -815,7 +813,7 @@ export default async function Home({
                         </div>
 
                         {c.stats && !rangeStats && (
-                          <p className="mt-4 text-xs text-body-gray">
+                          <p className="mt-3 text-xs text-body-gray">
                             Last pulled{" "}
                             {new Date(c.stats.pulled_at).toLocaleDateString()}
                           </p>
