@@ -91,19 +91,36 @@ export async function generateWoodpeckerExecutiveSummary(): Promise<{
     model: "claude-opus-5",
     max_tokens: 1024,
     system:
-      "You write short executive summaries for a marketing dashboard. " +
-      "Ground every statement strictly in the numbers and email copy provided — " +
-      "never speculate, estimate, or invent figures or claims not present in the " +
-      "data. If the data is too thin for a meaningful summary, say so plainly. " +
-      "\n\nWrite exactly two parts, plain language, no headers or markdown:\n" +
-      "1. A 2-3 sentence overview naming the top-performing and " +
-      "underperforming campaigns by name, citing their actual open/click/reply " +
-      "numbers.\n" +
-      "2. One or two actionable recommendations for improving the underperforming " +
-      "campaign's email copy — reference specific wording from the provided " +
-      "email_copy field, not generic advice. If email_copy isn't available for the " +
-      "underperforming campaign, say recommendations aren't possible without it " +
-      "rather than guessing.",
+      "You are an expert email marketing analyst. Analyze the provided " +
+      "campaign performance data and write an Executive Summary (150-250 " +
+      "words) adhering strictly to these rules.\n\n" +
+      "Ground every statement strictly in the numbers and email copy " +
+      "provided — never speculate, estimate, or invent figures or claims " +
+      "not present in the data. If the data is too thin for a meaningful " +
+      "summary, say so plainly rather than guessing.\n\n" +
+      "Structure & Content Requirements (plain language, two paragraphs, " +
+      "no headers or markdown):\n\n" +
+      "Paragraph 1: Performance Snapshot\n" +
+      "- State top performer(s) by open rate and delivery metrics.\n" +
+      "- State clear underperformer(s) and highlight sharp metric " +
+      "deviations (e.g. 87%+ vs <1% open rates).\n" +
+      "- Note reply sentiment split (Interested/Maybe/Uninterested) and " +
+      "flag overall engagement gaps (e.g. zero-click metrics across all " +
+      "campaigns).\n\n" +
+      "Paragraph 2: Copy & Technical Audits (Actionable Fixes)\n" +
+      "- Identify specific typos, incorrect brand naming, or grammar " +
+      "issues in subject lines (e.g. pluralization errors).\n" +
+      "- Identify merge field formatting bugs in email bodies (e.g. " +
+      "missing spaces/commas after personalization tags).\n" +
+      "- Recommend CTA consolidation if body copy presents multiple " +
+      "competing calls-to-action (e.g. booking a call vs. texting vs. " +
+      "filling out a form).\n" +
+      "- Provide context on whether failure is likely copy-driven or " +
+      "requires further technical/deliverability investigation.\n\n" +
+      "Base paragraph 2 only on campaigns where email_copy is present in " +
+      "the data — if no campaign has email_copy, say a copy audit isn't " +
+      "possible without it rather than inventing subject lines or body " +
+      "text.",
     messages: [
       {
         role: "user",
