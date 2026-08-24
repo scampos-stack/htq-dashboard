@@ -9,6 +9,7 @@ import {
   getVipSubmissions,
   getChannelBlendSummary,
   getChannelBlendAutomationStats,
+  getChannelBlendUploads,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
@@ -21,6 +22,7 @@ import { CarrierEditor } from "@/components/CarrierEditor";
 import { AutomationGoalEditor } from "@/components/AutomationGoalEditor";
 import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
 import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
+import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistory";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
@@ -376,13 +378,17 @@ function KeapBroadcastsList({
 function ChannelBlendSection({
   summary,
   automationStats,
+  uploads,
 }: {
   summary: Awaited<ReturnType<typeof getChannelBlendSummary>>;
   automationStats: Awaited<ReturnType<typeof getChannelBlendAutomationStats>>;
+  uploads: Awaited<ReturnType<typeof getChannelBlendUploads>>;
 }) {
   return (
     <div>
       <ChannelBlendUpload />
+
+      <ChannelBlendUploadHistory uploads={uploads} />
 
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
@@ -559,6 +565,7 @@ export default async function Home({
     vipSubmissions,
     channelBlendSummary,
     channelBlendAutomationStats,
+    channelBlendUploads,
     keapAutomationEvents,
     woodpeckerAiSummary,
     woodpeckerSentiment,
@@ -572,6 +579,7 @@ export default async function Home({
     getVipSubmissions(),
     getChannelBlendSummary(),
     getChannelBlendAutomationStats(),
+    getChannelBlendUploads(),
     getKeapAutomationEventVolume(eventsRange),
     getWoodpeckerAiSummary(),
     getWoodpeckerSentiment(),
@@ -658,6 +666,7 @@ export default async function Home({
               <ChannelBlendSection
                 summary={channelBlendSummary}
                 automationStats={channelBlendAutomationStats}
+                uploads={channelBlendUploads}
               />
             </SectionBlock>
           )}

@@ -12,6 +12,8 @@ export function ChannelBlendUpload() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
 
   async function upload(file: File) {
     if (
@@ -27,6 +29,8 @@ export function ChannelBlendUpload() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (periodStart) formData.append("periodStart", periodStart);
+      if (periodEnd) formData.append("periodEnd", periodEnd);
       const res = await fetch("/api/channel-blend/upload", {
         method: "POST",
         body: formData,
@@ -49,6 +53,30 @@ export function ChannelBlendUpload() {
       <h3 className="mb-3 font-heading text-base font-semibold text-charcoal">
         Upload Disposition Spreadsheet
       </h3>
+
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-body-gray">
+          Period start (optional)
+          <input
+            type="date"
+            value={periodStart}
+            onChange={(e) => setPeriodStart(e.target.value)}
+            className="rounded-lg border border-black/10 px-2 py-1 text-sm text-charcoal"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold text-body-gray">
+          Period end (optional)
+          <input
+            type="date"
+            value={periodEnd}
+            onChange={(e) => setPeriodEnd(e.target.value)}
+            className="rounded-lg border border-black/10 px-2 py-1 text-sm text-charcoal"
+          />
+        </label>
+        <p className="pb-1.5 text-xs text-body-gray">
+          What date range this list covers — not in the file, so set it manually.
+        </p>
+      </div>
 
       <div
         onDragOver={(e) => {

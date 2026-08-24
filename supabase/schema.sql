@@ -87,6 +87,20 @@ create table if not exists keap_broadcasts (
   created_at       timestamptz not null default now()
 );
 
+-- One row per Channel Blend spreadsheet upload — powers an upload history
+-- list with a manually-entered period (the sheet doesn't say what date
+-- range it covers) and a revert option that removes everything the upload
+-- added without touching rows from other uploads.
+create table if not exists channel_blend_uploads (
+  id           bigint generated always as identity primary key,
+  filename     text not null,
+  uploaded_at  timestamptz not null default now(),
+  period_start date,
+  period_end   date,
+  row_count    integer not null default 0,
+  reverted_at  timestamptz
+);
+
 -- Parsed from uploaded Channel Blend (manual outreach) disposition spreadsheets.
 -- Category = the source sheet tab (Email Requests / Keap Sent / Appointments /
 -- Feedback) — deliberately separate from campaigns.carrier, which this data
@@ -103,10 +117,12 @@ create table if not exists channel_blend_dispositions (
   preferred_email text,
   details         text,
   raw             jsonb not null,
+  upload_id       bigint references channel_blend_uploads(id) on delete set null,
   created_at      timestamptz not null default now()
 );
 
 create index if not exists idx_channel_blend_category on channel_blend_dispositions (category);
+create index if not exists idx_channel_blend_dispositions_upload on channel_blend_dispositions (upload_id);
 
 -- Events pushed from Keap automation webhook steps (email sent/opened/etc).
 create table if not exists keap_automation_events (

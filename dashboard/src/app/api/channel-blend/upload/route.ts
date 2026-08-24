@@ -12,6 +12,8 @@ export async function POST(req: Request) {
 
     const buffer = await file.arrayBuffer();
     const filename = file instanceof File ? file.name : "upload.xlsx";
+    const periodStart = formData.get("periodStart");
+    const periodEnd = formData.get("periodEnd");
     const rows = await parseChannelBlendWorkbook(buffer, filename);
 
     if (rows.length === 0) {
@@ -31,6 +33,18 @@ export async function POST(req: Request) {
     const newRows = rows.filter((r) => !existingHashes.has(r.rowHash));
     const duplicateCount = rows.length - newRows.length;
 
+    const { data: upload, error: uploadErr } = await supabase
+      .from("channel_blend_uploads")
+      .insert({
+        filename,
+        period_start: typeof periodStart === "string" && periodStart ? periodStart : null,
+        period_end: typeof periodEnd === "string" && periodEnd ? periodEnd : null,
+        row_count: newRows.length,
+      })
+      .select("id")
+      .single();
+    if (uploadErr) throw uploadErr;
+
     if (newRows.length > 0) {
       const payload = newRows.map((r) => ({
         row_hash: r.rowHash,
@@ -43,6 +57,7 @@ export async function POST(req: Request) {
         preferred_email: r.preferredEmail,
         details: r.details,
         raw: r.raw,
+        upload_id: upload.id,
       }));
       const { error: insertErr } = await supabase
         .from("channel_blend_dispositions")

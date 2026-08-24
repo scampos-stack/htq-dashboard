@@ -98,6 +98,36 @@ export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
   };
 }
 
+export type ChannelBlendUploadRecord = {
+  id: number;
+  filename: string;
+  uploadedAt: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  rowCount: number;
+  revertedAt: string | null;
+};
+
+export async function getChannelBlendUploads(): Promise<ChannelBlendUploadRecord[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("channel_blend_uploads")
+    .select("id, filename, uploaded_at, period_start, period_end, row_count, reverted_at")
+    .order("uploaded_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    filename: r.filename,
+    uploadedAt: r.uploaded_at,
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+    rowCount: r.row_count,
+    revertedAt: r.reverted_at,
+  }));
+}
+
 export type KeapAutomationEventVolume = {
   automationName: string;
   eventType: string;
