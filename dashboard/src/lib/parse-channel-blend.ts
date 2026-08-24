@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import crypto from "crypto";
+import { Readable } from "stream";
 
 export type ChannelBlendRow = {
   rowHash: string;
@@ -20,12 +21,14 @@ export type ChannelBlendRow = {
 // never silently skipped, just stored generically.
 const HEADER_ALIASES: Record<string, keyof ChannelBlendRow> = {
   "lead name": "leadName",
+  name: "leadName",
   "new contact": "newContact",
   "phone number": "phoneNumber",
   state: "state",
   "email on file": "emailOnFile",
   "preferred email": "preferredEmail",
   details: "details",
+  notes: "details",
 };
 
 function cellText(cell: ExcelJS.Cell): string | null {
@@ -36,12 +39,31 @@ function cellText(cell: ExcelJS.Cell): string | null {
   return String(v).trim() || null;
 }
 
-export async function parseChannelBlendWorkbook(
-  buffer: ArrayBuffer
-): Promise<ChannelBlendRow[]> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+function findHeaderValue(
+  raw: Record<string, string | null>,
+  matcher: RegExp
+): string | null {
+  for (const [header, value] of Object.entries(raw)) {
+    if (matcher.test(header.trim())) return value;
+  }
+  return null;
+}
 
+// CSV exports have no sheet tabs to name the disposition category, so it's
+// pulled from the filename instead — uploaders consistently name exports
+// like "Channel Blend Export (Email Requests) (2).csv", so the last
+// non-numeric parenthetical is a reliable stand-in for a sheet name.
+function categoryFromFilename(filename: string): string {
+  const parens = [...filename.matchAll(/\(([^()]+)\)/g)];
+  for (let i = parens.length - 1; i >= 0; i--) {
+    const text = parens[i][1].trim();
+    if (text && !/^\d+$/.test(text)) return text;
+  }
+  const base = filename.replace(/\.[^.]+$/, "").trim();
+  return base || "Imported";
+}
+
+function extractRows(workbook: ExcelJS.Workbook): ChannelBlendRow[] {
   const rows: ChannelBlendRow[] = [];
 
   for (const worksheet of workbook.worksheets) {
@@ -75,6 +97,13 @@ export async function parseChannelBlendWorkbook(
         if (field) known[field] = value as never;
       }
 
+      // "Name" + "Last name" as separate columns (common in CSV exports)
+      // combine into leadName instead of the last one silently winning.
+      const lastName = findHeaderValue(raw, /^last\s*name$/i);
+      if (lastName) {
+        known.leadName = [known.leadName, lastName].filter(Boolean).join(" ").trim() || null;
+      }
+
       const stableRaw = Object.fromEntries(
         Object.entries(raw).sort(([a], [b]) => a.localeCompare(b))
       );
@@ -99,4 +128,25 @@ export async function parseChannelBlendWorkbook(
   }
 
   return rows;
+}
+
+export async function parseChannelBlendWorkbook(
+  buffer: ArrayBuffer,
+  filename: string
+): Promise<ChannelBlendRow[]> {
+  const isCsv = /\.csv$/i.test(filename);
+  const workbook = new ExcelJS.Workbook();
+
+  if (isCsv) {
+    // ExcelJS's zip-based xlsx loader chokes on plain CSV ("Can't find end
+    // of central directory") since xlsx files are zip archives and CSVs
+    // aren't — CSV needs its own text-based reader instead.
+    const text = Buffer.from(buffer).toString("utf-8").replace(/^﻿/, "");
+    const worksheet = await workbook.csv.read(Readable.from([text]));
+    worksheet.name = categoryFromFilename(filename);
+  } else {
+    await workbook.xlsx.load(buffer);
+  }
+
+  return extractRows(workbook);
 }

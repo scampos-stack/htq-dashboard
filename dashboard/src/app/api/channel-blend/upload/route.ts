@@ -11,7 +11,8 @@ export async function POST(req: Request) {
     }
 
     const buffer = await file.arrayBuffer();
-    const rows = await parseChannelBlendWorkbook(buffer);
+    const filename = file instanceof File ? file.name : "upload.xlsx";
+    const rows = await parseChannelBlendWorkbook(buffer, filename);
 
     if (rows.length === 0) {
       return NextResponse.json(
