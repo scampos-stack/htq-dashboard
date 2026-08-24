@@ -25,6 +25,11 @@ export function SyncButton() {
       } else if (data.woodpecker?.error) {
         parts.push(`Woodpecker failed`);
       }
+      if (data.woodpecker?.stepStatsError) {
+        parts.push(`Step stats failed: ${data.woodpecker.stepStatsError}`);
+      } else if (data.woodpecker?.stepSnapshots != null) {
+        parts.push(`Step stats: ${data.woodpecker.stepSnapshots} rows`);
+      }
       if (data.keap?.campaigns != null) {
         parts.push(`Keap: ${data.keap.campaigns} automations`);
       } else if (data.keap?.error) {

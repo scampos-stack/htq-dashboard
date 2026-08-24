@@ -110,6 +110,7 @@ export async function syncWoodpecker(): Promise<{
   campaigns: number;
   snapshots: number;
   stepSnapshots: number;
+  stepStatsError?: string;
 }> {
   const supabase = supabaseServer();
 
@@ -180,6 +181,7 @@ export async function syncWoodpecker(): Promise<{
   if (snapshotErr) throw snapshotErr;
 
   let stepSnapshotCount = 0;
+  let stepStatsError: string | undefined;
   try {
     const reportRows = await fetchStepStatsReport();
     const stepPayload = reportRows
@@ -215,6 +217,7 @@ export async function syncWoodpecker(): Promise<{
     // Step-level stats are additive on top of the aggregate snapshot already
     // saved above — the reports API is async and has its own rate limits,
     // so a hiccup here shouldn't fail the whole sync.
+    stepStatsError = err instanceof Error ? err.message : String(err);
     console.error("[sync] woodpecker step stats failed:", err);
   }
 
@@ -222,5 +225,6 @@ export async function syncWoodpecker(): Promise<{
     campaigns: campaignsPayload.length,
     snapshots: snapshotPayload.length,
     stepSnapshots: stepSnapshotCount,
+    ...(stepStatsError ? { stepStatsError } : {}),
   };
 }
