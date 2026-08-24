@@ -10,7 +10,7 @@ import {
   getChannelBlendSummary,
   getChannelBlendAutomationStats,
   getChannelBlendUploads,
-  getChannelBlendPatternsSummary,
+  getChannelBlendCategoryPatterns,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
@@ -385,12 +385,12 @@ function ChannelBlendSection({
   summary,
   automationStats,
   uploads,
-  patternsSummary,
+  patterns,
 }: {
   summary: Awaited<ReturnType<typeof getChannelBlendSummary>>;
   automationStats: Awaited<ReturnType<typeof getChannelBlendAutomationStats>>;
   uploads: Awaited<ReturnType<typeof getChannelBlendUploads>>;
-  patternsSummary: Awaited<ReturnType<typeof getChannelBlendPatternsSummary>>;
+  patterns: Awaited<ReturnType<typeof getChannelBlendCategoryPatterns>>;
 }) {
   return (
     <div>
@@ -398,7 +398,7 @@ function ChannelBlendSection({
 
       <ChannelBlendUploadHistory uploads={uploads} />
 
-      <ChannelBlendPatternsCard summary={patternsSummary} />
+      <ChannelBlendPatternsCard patterns={patterns} />
 
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
@@ -595,7 +595,7 @@ export default async function Home({
     channelBlendSummary,
     channelBlendAutomationStats,
     channelBlendUploads,
-    channelBlendPatternsSummary,
+    channelBlendPatterns,
     keapAutomationEvents,
     woodpeckerAiSummary,
     woodpeckerSentiment,
@@ -610,7 +610,7 @@ export default async function Home({
     getChannelBlendSummary(),
     getChannelBlendAutomationStats(),
     getChannelBlendUploads(),
-    getChannelBlendPatternsSummary(),
+    getChannelBlendCategoryPatterns(),
     getKeapAutomationEventVolume(eventsRange),
     getWoodpeckerAiSummary(),
     getWoodpeckerSentiment(),
@@ -698,7 +698,7 @@ export default async function Home({
                 summary={channelBlendSummary}
                 automationStats={channelBlendAutomationStats}
                 uploads={channelBlendUploads}
-                patternsSummary={channelBlendPatternsSummary}
+                patterns={channelBlendPatterns}
               />
             </SectionBlock>
           )}

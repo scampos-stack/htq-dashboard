@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseServer } from "./supabase-server";
 import { stripHtml } from "./strip-html";
+import { slugifyCategory } from "./slugify-category";
 
 type CampaignDigest = {
   name: string;
@@ -155,76 +156,90 @@ export async function generateWoodpeckerExecutiveSummary(): Promise<{
 }
 
 type ChannelBlendEntry = {
-  category: string;
   leadName: string | null;
   state: string | null;
   details: string | null;
 };
 
-async function getChannelBlendDigest(): Promise<ChannelBlendEntry[]> {
+async function getCategoryDigest(category: string): Promise<ChannelBlendEntry[]> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
     .from("channel_blend_dispositions")
-    .select("category, lead_name, state, details")
+    .select("lead_name, state, details")
+    .eq("category", category)
     .not("details", "is", null);
   if (error) throw error;
 
   return (data ?? []).map((r) => ({
-    category: r.category,
     leadName: r.lead_name,
     state: r.state,
     details: r.details,
   }));
 }
 
-// Regenerated after every Channel Blend upload that adds rows — there's no
-// scheduled sync for manually-uploaded data, so the upload itself is the
-// trigger point (see /api/channel-blend/upload).
-export async function generateChannelBlendPatternsSummary(): Promise<{
-  generated: boolean;
-  reason?: string;
-}> {
+async function getPreviousCategorySummary(category: string): Promise<string | null> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("ai_summaries")
+    .select("summary")
+    .eq("scope", `channel_blend_patterns:${slugifyCategory(category)}`)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.summary ?? null;
+}
+
+// One category at a time so each gets its own card and — since the previous
+// summary for that exact category is fed back in — a grounded note on what
+// shifted since last time, instead of a single blob covering everything.
+async function generateChannelBlendCategoryPatterns(
+  category: string
+): Promise<{ generated: boolean; reason?: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return { generated: false, reason: "ANTHROPIC_API_KEY not configured" };
   }
 
-  const digest = await getChannelBlendDigest();
+  const digest = await getCategoryDigest(category);
   if (digest.length === 0) {
-    return { generated: false, reason: "No Channel Blend entries with details yet" };
+    return { generated: false, reason: `No "${category}" entries with details yet` };
   }
 
+  const previous = await getPreviousCategorySummary(category);
   const client = new Anthropic({ apiKey });
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 2048,
+    max_tokens: 1024,
     system:
-      "You analyze call disposition notes from a lead-generation outreach " +
-      "team's Channel Blend spreadsheet. Each entry has a category (e.g. " +
-      "Appointments, Email Requests, Feedback) and a free-text \"details\" " +
-      "note describing what happened on that call. Ground every pattern " +
-      "strictly in the details text provided — never invent reasons or " +
-      "counts not supported by the data.\n\n" +
-      "For EACH distinct category present in the data, output one compact " +
-      "section:\n" +
-      "- A line with just the category name.\n" +
-      "- The top 3 most common recurring patterns in that category's " +
-      "details, each as a short bullet: a plain-language label for the " +
-      "pattern, the approximate count of entries matching it, and one " +
-      "representative example quoted or closely paraphrased from the " +
-      "details.\n" +
-      "If a category has fewer than 3 genuinely distinct patterns, list " +
-      "only as many as are real — don't pad to 3. Keep every bullet to one " +
-      "line, easy to scan at a glance. Plain text only — no markdown " +
-      "headers, no bold, no nested sub-bullets.",
+      `You analyze call disposition notes from the "${category}" category ` +
+      "of a lead-generation outreach team's Channel Blend spreadsheet. Each " +
+      "entry has a free-text \"details\" note describing what happened on " +
+      "that call. Ground every pattern strictly in the details text " +
+      "provided — never invent reasons or counts not supported by the " +
+      "data.\n\n" +
+      "Output the top 3 most common recurring patterns, ranked by " +
+      "frequency, each as a short one-line bullet: a plain-language label, " +
+      "the approximate count of entries matching it, and one representative " +
+      "example quoted or closely paraphrased from the details. If fewer " +
+      "than 3 genuinely distinct patterns exist, list only as many as are " +
+      "real — don't pad to 3. Plain text only, no markdown headers, no " +
+      "bold, no nested sub-bullets.\n\n" +
+      (previous
+        ? "You are also given the PREVIOUS summary generated for this same " +
+          "category. After the bullets, add ONE short sentence noting a " +
+          "genuine, data-grounded shift from that previous summary (e.g. a " +
+          "reason that's now more or less common than before) — only if " +
+          "there's a real difference. If the patterns are essentially " +
+          "unchanged, say so briefly instead of inventing a shift."
+        : "This is the first summary generated for this category — there is " +
+          "no previous version, so don't mention a comparison."),
     messages: [
       {
         role: "user",
         content:
-          "Here are the Channel Blend disposition entries (JSON), each " +
-          "tagged with its category. Identify the top 3 recurring patterns " +
-          "per category:\n\n" + JSON.stringify(digest, null, 2),
+          `Here are the "${category}" disposition entries (JSON):\n\n` +
+          JSON.stringify(digest, null, 2) +
+          (previous ? `\n\nPrevious summary for this category:\n\n${previous}` : ""),
       },
     ],
   });
@@ -235,20 +250,20 @@ export async function generateChannelBlendPatternsSummary(): Promise<{
   const summary = textBlock?.text?.trim();
   if (!summary) {
     console.error(
-      "[channel-blend patterns] no text content, stop_reason:",
+      `[channel-blend patterns:${category}] no text content, stop_reason:`,
       response.stop_reason,
       JSON.stringify(response.content)
     );
     return {
       generated: false,
-      reason: `Claude returned no text content (stop_reason: ${response.stop_reason})`,
+      reason: `Claude returned no text content for "${category}" (stop_reason: ${response.stop_reason})`,
     };
   }
 
   const supabase = supabaseServer();
   const { error } = await supabase.from("ai_summaries").upsert(
     {
-      scope: "channel_blend_patterns",
+      scope: `channel_blend_patterns:${slugifyCategory(category)}`,
       summary,
       generated_at: new Date().toISOString(),
     },
@@ -257,4 +272,35 @@ export async function generateChannelBlendPatternsSummary(): Promise<{
   if (error) throw error;
 
   return { generated: true };
+}
+
+// Regenerated after every Channel Blend upload that adds rows — there's no
+// scheduled sync for manually-uploaded data, so the upload itself is the
+// trigger point (see /api/channel-blend/upload). Fans out one Claude call
+// per distinct category rather than one call covering everything.
+export async function generateChannelBlendPatternsSummary(): Promise<{
+  generated: boolean;
+  reason?: string;
+  categories?: number;
+}> {
+  const supabase = supabaseServer();
+  const { data: catRows, error: catErr } = await supabase
+    .from("channel_blend_dispositions")
+    .select("category");
+  if (catErr) throw catErr;
+
+  const categories = [...new Set((catRows ?? []).map((r) => r.category))];
+  if (categories.length === 0) {
+    return { generated: false, reason: "No Channel Blend entries yet" };
+  }
+
+  const results = await Promise.all(
+    categories.map((c) => generateChannelBlendCategoryPatterns(c))
+  );
+  const generatedCount = results.filter((r) => r.generated).length;
+  if (generatedCount === 0) {
+    return { generated: false, reason: results[0]?.reason ?? "No summaries generated" };
+  }
+
+  return { generated: true, categories: generatedCount };
 }

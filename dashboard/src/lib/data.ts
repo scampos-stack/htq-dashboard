@@ -1,5 +1,6 @@
 import { supabaseServer } from "./supabase-server";
 import { carrierFromEmail } from "./carrier-from-email";
+import { slugifyCategory } from "./slugify-category";
 
 export type WoodpeckerAiSummary = {
   summary: string;
@@ -117,21 +118,38 @@ export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
   };
 }
 
-export type ChannelBlendPatternsSummary = {
+export type ChannelBlendCategoryPattern = {
+  category: string;
   summary: string;
   generatedAt: string;
-} | null;
+};
 
-export async function getChannelBlendPatternsSummary(): Promise<ChannelBlendPatternsSummary> {
+export async function getChannelBlendCategoryPatterns(): Promise<ChannelBlendCategoryPattern[]> {
   const supabase = supabaseServer();
+
+  const { data: catRows, error: catErr } = await supabase
+    .from("channel_blend_dispositions")
+    .select("category");
+  if (catErr) throw catErr;
+
+  const categories = [...new Set((catRows ?? []).map((r) => r.category))];
+  if (categories.length === 0) return [];
+
+  const scopeByCategory = new Map(categories.map((c) => [`channel_blend_patterns:${slugifyCategory(c)}`, c]));
   const { data, error } = await supabase
     .from("ai_summaries")
-    .select("summary, generated_at")
-    .eq("scope", "channel_blend_patterns")
-    .maybeSingle();
+    .select("scope, summary, generated_at")
+    .in("scope", [...scopeByCategory.keys()]);
   if (error) throw error;
-  if (!data) return null;
-  return { summary: data.summary, generatedAt: data.generated_at };
+
+  return (data ?? [])
+    .map((row) => {
+      const category = scopeByCategory.get(row.scope);
+      if (!category) return null;
+      return { category, summary: row.summary, generatedAt: row.generated_at };
+    })
+    .filter((r): r is ChannelBlendCategoryPattern => r !== null)
+    .sort((a, b) => a.category.localeCompare(b.category));
 }
 
 export type ChannelBlendUploadRecord = {
