@@ -27,6 +27,8 @@ import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistor
 import { ChannelBlendFeedbackCard } from "@/components/ChannelBlendFeedbackCard";
 import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable";
 import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
+import { CampaignEmailContent } from "@/components/CampaignEmailContent";
+import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
@@ -820,6 +822,8 @@ export default async function Home({
                         )}
 
                         {!rangeStats && <CampaignStepBreakdown steps={c.steps} />}
+                        <CampaignEmailContent emailCopy={c.emailCopy} />
+                        <CampaignProspectsPanel campaignId={c.id} />
                       </div>
                     );
                   })}

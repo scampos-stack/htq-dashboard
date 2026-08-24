@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseServer } from "./supabase-server";
+import { stripHtml } from "./strip-html";
 
 type CampaignDigest = {
   name: string;
@@ -17,13 +18,6 @@ type CampaignDigest = {
   interestedNo: number | null;
   emailCopy: { subject: string | null; msg: string | null }[] | null;
 };
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 async function getWoodpeckerDigest(): Promise<CampaignDigest[]> {
   const supabase = supabaseServer();

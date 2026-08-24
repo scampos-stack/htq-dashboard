@@ -30,6 +30,11 @@ export function SyncButton() {
       } else if (data.woodpecker?.stepSnapshots != null) {
         parts.push(`Step stats: ${data.woodpecker.stepSnapshots} rows`);
       }
+      if (data.woodpecker?.prospectsError) {
+        parts.push(`Prospects failed: ${data.woodpecker.prospectsError}`);
+      } else if (data.woodpecker?.prospects != null) {
+        parts.push(`Prospects: ${data.woodpecker.prospects}`);
+      }
       if (data.keap?.campaigns != null) {
         parts.push(`Keap: ${data.keap.campaigns} automations`);
       } else if (data.keap?.error) {

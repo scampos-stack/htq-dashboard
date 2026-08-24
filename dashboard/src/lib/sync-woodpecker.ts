@@ -83,6 +83,33 @@ async function fetchStepStatsReport(): Promise<WoodpeckerReportRow[]> {
   throw new Error("Woodpecker report timed out waiting for READY status");
 }
 
+type WoodpeckerProspect = {
+  email: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  status?: string | null;
+  campaigns_details?: {
+    campaign_id: number;
+    campaign_prospect_status?: string | null;
+    interest_level?: { level?: string | null } | null;
+  }[];
+};
+
+// Individual prospect rows (email/name/status/interest) per campaign —
+// separate from the aggregate/step stats above. campaigns_details=true asks
+// for the per-campaign enrollment status and interest level rather than
+// just the prospect's global status.
+async function fetchWoodpeckerProspects(
+  campaignExternalIds: string[]
+): Promise<WoodpeckerProspect[]> {
+  if (campaignExternalIds.length === 0) return [];
+  const ids = campaignExternalIds.join(",");
+  const result = await wpFetch(
+    `/prospects?campaigns_id=${ids}&campaigns_details=true&per_page=1000`
+  );
+  return Array.isArray(result) ? result : [];
+}
+
 type WoodpeckerCampaign = {
   id: number;
   name: string;
@@ -111,6 +138,8 @@ export async function syncWoodpecker(): Promise<{
   snapshots: number;
   stepSnapshots: number;
   stepStatsError?: string;
+  prospects: number;
+  prospectsError?: string;
 }> {
   const supabase = supabaseServer();
 
@@ -221,10 +250,57 @@ export async function syncWoodpecker(): Promise<{
     console.error("[sync] woodpecker step stats failed:", err);
   }
 
+  let prospectCount = 0;
+  let prospectsError: string | undefined;
+  try {
+    const externalIds = campaignList.map((c) => String(c.id));
+    const prospects = await fetchWoodpeckerProspects(externalIds);
+
+    const prospectPayload: {
+      campaign_id: number;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      status: string | null;
+      interest_level: string | null;
+      updated_at: string;
+    }[] = [];
+    const now = new Date().toISOString();
+    for (const p of prospects) {
+      for (const d of p.campaigns_details ?? []) {
+        const campaignId = campaignIdByExternalId.get(String(d.campaign_id));
+        if (!campaignId) continue;
+        prospectPayload.push({
+          campaign_id: campaignId,
+          email: p.email,
+          first_name: p.first_name ?? null,
+          last_name: p.last_name ?? null,
+          status: d.campaign_prospect_status ?? p.status ?? null,
+          interest_level: d.interest_level?.level ?? null,
+          updated_at: now,
+        });
+      }
+    }
+
+    if (prospectPayload.length > 0) {
+      const { error: prospectErr } = await supabase
+        .from("woodpecker_prospects")
+        .upsert(prospectPayload, { onConflict: "campaign_id,email" });
+      if (prospectErr) throw prospectErr;
+      prospectCount = prospectPayload.length;
+    }
+  } catch (err) {
+    // Prospect-level detail is additive too — don't let it fail the sync.
+    prospectsError = err instanceof Error ? err.message : String(err);
+    console.error("[sync] woodpecker prospects failed:", err);
+  }
+
   return {
     campaigns: campaignsPayload.length,
     snapshots: snapshotPayload.length,
     stepSnapshots: stepSnapshotCount,
     ...(stepStatsError ? { stepStatsError } : {}),
+    prospects: prospectCount,
+    ...(prospectsError ? { prospectsError } : {}),
   };
 }

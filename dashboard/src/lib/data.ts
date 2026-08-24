@@ -363,6 +363,7 @@ export type CampaignWithStats = {
     pulled_at: string;
   } | null;
   steps: CampaignStepStat[];
+  emailCopy: { subject: string | null; msg: string | null }[];
 };
 
 export type RangeStats = { sent: number; delivered: number; opened: number };
@@ -691,7 +692,7 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
 
   const { data: campaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, source, name, owner, status, carrier")
+    .select("id, source, name, owner, status, carrier, email_copy")
     .eq("source", "woodpecker")
     .order("name");
   if (campaignsErr) throw campaignsErr;
@@ -753,8 +754,9 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
 
   return campaigns.map((c) => {
     const s = latestByCampaign.get(c.id);
+    const { email_copy, ...rest } = c;
     return {
-      ...c,
+      ...rest,
       stats: s
         ? {
             sent: s.sent,
@@ -773,6 +775,7 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
           }
         : null,
       steps: stepsByCampaign.get(c.id) ?? [],
+      emailCopy: (email_copy ?? []) as { subject: string | null; msg: string | null }[],
     };
   });
 }
