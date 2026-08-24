@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins, Open_Sans, Cinzel } from "next/font/google";
+import { Poppins, Open_Sans } from "next/font/google";
 import "./globals.css";
 
 const heading = Poppins({
@@ -13,13 +13,6 @@ const body = Open_Sans({
   subsets: ["latin"],
 });
 
-// Only used by the "One Ring" theme Easter egg — see ThemeToggle.
-const ring = Cinzel({
-  variable: "--font-ring",
-  subsets: ["latin"],
-  weight: ["600", "700"],
-});
-
 export const metadata: Metadata = {
   title: "HTQ Marketing Dashboard",
   description: "HometownQuotes marketing engagement & pipeline dashboard",
@@ -29,18 +22,15 @@ const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var saved = localStorage.getItem("htq-theme");
-    var theme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    if (theme === "dark" || theme === "ring") document.documentElement.classList.add(theme === "ring" ? "one-ring" : "dark");
+    var dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (dark) document.documentElement.classList.add("dark");
   } catch (e) {}
 })();
 `;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${heading.variable} ${body.variable} ${ring.variable} h-full`}
-    >
+    <html lang="en" className={`${heading.variable} ${body.variable} h-full`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
