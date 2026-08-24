@@ -66,7 +66,11 @@ type WoodpeckerReportRow = {
 async function fetchStepStatsReport(): Promise<WoodpeckerReportRow[]> {
   const to = new Date();
   const from = new Date();
-  from.setDate(from.getDate() - 30); // API caps reports at the last 30 days
+  // API caps reports at the last 30 days; using exactly 30 got rejected
+  // ("Reports can be generated from the last 30 days") since `to` (today,
+  // date-only) makes the requested span 31 days inclusive — back off by 29
+  // instead to stay inside the boundary.
+  from.setDate(from.getDate() - 29);
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
   const started = await wpFetchV2("/reports/complete_statistics_for_each_level_of_campaign", {
