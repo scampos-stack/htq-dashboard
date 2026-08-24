@@ -1,4 +1,5 @@
 import { supabaseServer } from "./supabase-server";
+import { carrierFromEmail } from "./carrier-from-email";
 
 export type WoodpeckerAiSummary = {
   summary: string;
@@ -56,6 +57,8 @@ export type ChannelBlendSummary = {
   totalRows: number;
   appointmentsBooked: number;
   byCategory: { category: string; count: number }[];
+  byState: { state: string; count: number }[];
+  byCarrier: { carrier: string; count: number }[];
   recent: {
     id: number;
     category: string;
@@ -71,14 +74,24 @@ export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
 
   const { data, error } = await supabase
     .from("channel_blend_dispositions")
-    .select("id, category, lead_name, state, details, created_at")
+    .select("id, category, lead_name, state, details, created_at, email_on_file, preferred_email")
     .order("created_at", { ascending: false });
   if (error) throw error;
 
   const rows = data ?? [];
   const byCategoryMap = new Map<string, number>();
+  const byStateMap = new Map<string, number>();
+  const byCarrierMap = new Map<string, number>();
   for (const r of rows) {
     byCategoryMap.set(r.category, (byCategoryMap.get(r.category) ?? 0) + 1);
+
+    if (r.state) {
+      const state = r.state.trim().toUpperCase();
+      byStateMap.set(state, (byStateMap.get(state) ?? 0) + 1);
+    }
+
+    const carrier = carrierFromEmail(r.email_on_file) ?? carrierFromEmail(r.preferred_email);
+    if (carrier) byCarrierMap.set(carrier, (byCarrierMap.get(carrier) ?? 0) + 1);
   }
 
   return {
@@ -86,6 +99,12 @@ export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
     appointmentsBooked: byCategoryMap.get("Appointments") ?? 0,
     byCategory: [...byCategoryMap.entries()]
       .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count),
+    byState: [...byStateMap.entries()]
+      .map(([state, count]) => ({ state, count }))
+      .sort((a, b) => b.count - a.count),
+    byCarrier: [...byCarrierMap.entries()]
+      .map(([carrier, count]) => ({ carrier, count }))
       .sort((a, b) => b.count - a.count),
     recent: rows.slice(0, 25).map((r) => ({
       id: r.id,
@@ -96,6 +115,23 @@ export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
       createdAt: r.created_at,
     })),
   };
+}
+
+export type ChannelBlendFeedbackSummary = {
+  summary: string;
+  generatedAt: string;
+} | null;
+
+export async function getChannelBlendFeedbackSummary(): Promise<ChannelBlendFeedbackSummary> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("ai_summaries")
+    .select("summary, generated_at")
+    .eq("scope", "channel_blend_feedback")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { summary: data.summary, generatedAt: data.generated_at };
 }
 
 export type ChannelBlendUploadRecord = {

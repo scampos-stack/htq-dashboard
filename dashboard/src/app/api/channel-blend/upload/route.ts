@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { parseChannelBlendWorkbook } from "@/lib/parse-channel-blend";
+import { generateChannelBlendFeedbackSummary } from "@/lib/generate-summary";
 
 export async function POST(req: Request) {
   try {
@@ -63,6 +64,15 @@ export async function POST(req: Request) {
         .from("channel_blend_dispositions")
         .upsert(payload, { onConflict: "row_hash", ignoreDuplicates: true });
       if (insertErr) throw insertErr;
+    }
+
+    // Refresh the AI feedback summary when this upload touched the Feedback
+    // category — a failure here shouldn't fail the upload that already
+    // succeeded, just leave the summary stale.
+    if (newRows.some((r) => r.category.toLowerCase() === "feedback")) {
+      await generateChannelBlendFeedbackSummary().catch((err) => {
+        console.error("[channel-blend upload] feedback summary failed:", err);
+      });
     }
 
     return NextResponse.json({

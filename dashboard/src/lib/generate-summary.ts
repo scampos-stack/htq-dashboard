@@ -142,3 +142,90 @@ export async function generateWoodpeckerExecutiveSummary(): Promise<{
 
   return { generated: true };
 }
+
+type FeedbackEntry = {
+  leadName: string | null;
+  state: string | null;
+  details: string | null;
+};
+
+async function getChannelBlendFeedbackDigest(): Promise<FeedbackEntry[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("channel_blend_dispositions")
+    .select("lead_name, state, details")
+    .ilike("category", "feedback")
+    .not("details", "is", null);
+  if (error) throw error;
+
+  return (data ?? []).map((r) => ({
+    leadName: r.lead_name,
+    state: r.state,
+    details: r.details,
+  }));
+}
+
+// Regenerated after each Channel Blend upload that touches the "Feedback"
+// category — there's no scheduled sync for manually-uploaded data, so the
+// upload itself is the trigger point (see /api/channel-blend/upload).
+export async function generateChannelBlendFeedbackSummary(): Promise<{
+  generated: boolean;
+  reason?: string;
+}> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { generated: false, reason: "ANTHROPIC_API_KEY not configured" };
+  }
+
+  const digest = await getChannelBlendFeedbackDigest();
+  if (digest.length === 0) {
+    return { generated: false, reason: "No Feedback entries yet" };
+  }
+
+  const client = new Anthropic({ apiKey });
+
+  const response = await client.messages.create({
+    model: "claude-opus-5",
+    max_tokens: 1024,
+    system:
+      "You analyze call disposition notes from a lead-generation outreach " +
+      "team's \"Feedback\" category and surface the most common reasons " +
+      "contacts gave. Ground every theme strictly in the details text " +
+      "provided — never invent reasons or counts not supported by the data." +
+      "\n\nOutput a numbered list of the top 5 recurring themes, ranked by " +
+      "frequency, plain language, no markdown headers or bold. For each: a " +
+      "short theme title, the count of entries matching it, and one " +
+      "representative example quoted or closely paraphrased from the " +
+      "details. If fewer than 5 distinct themes exist, list only as many as " +
+      "are genuinely distinct.",
+    messages: [
+      {
+        role: "user",
+        content:
+          "Here are the Feedback disposition entries (JSON). Identify the " +
+          "top 5 recurring feedback themes:\n\n" + JSON.stringify(digest, null, 2),
+      },
+    ],
+  });
+
+  const textBlock = response.content.find(
+    (b): b is Anthropic.TextBlock => b.type === "text"
+  );
+  const summary = textBlock?.text?.trim();
+  if (!summary) {
+    return { generated: false, reason: "Claude returned no text content" };
+  }
+
+  const supabase = supabaseServer();
+  const { error } = await supabase.from("ai_summaries").upsert(
+    {
+      scope: "channel_blend_feedback",
+      summary,
+      generated_at: new Date().toISOString(),
+    },
+    { onConflict: "scope" }
+  );
+  if (error) throw error;
+
+  return { generated: true };
+}

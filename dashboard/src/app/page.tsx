@@ -10,6 +10,7 @@ import {
   getChannelBlendSummary,
   getChannelBlendAutomationStats,
   getChannelBlendUploads,
+  getChannelBlendFeedbackSummary,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
@@ -23,6 +24,7 @@ import { AutomationGoalEditor } from "@/components/AutomationGoalEditor";
 import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
 import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistory";
+import { ChannelBlendFeedbackCard } from "@/components/ChannelBlendFeedbackCard";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
@@ -379,16 +381,20 @@ function ChannelBlendSection({
   summary,
   automationStats,
   uploads,
+  feedbackSummary,
 }: {
   summary: Awaited<ReturnType<typeof getChannelBlendSummary>>;
   automationStats: Awaited<ReturnType<typeof getChannelBlendAutomationStats>>;
   uploads: Awaited<ReturnType<typeof getChannelBlendUploads>>;
+  feedbackSummary: Awaited<ReturnType<typeof getChannelBlendFeedbackSummary>>;
 }) {
   return (
     <div>
       <ChannelBlendUpload />
 
       <ChannelBlendUploadHistory uploads={uploads} />
+
+      <ChannelBlendFeedbackCard summary={feedbackSummary} />
 
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
@@ -439,26 +445,80 @@ function ChannelBlendSection({
       )}
 
       {summary.byCategory.length > 0 && (
-        <div className="mb-6 overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-          <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
-            Breakdown by Category
-          </h3>
-          <table className="w-full min-w-[320px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-                <th className="py-2 pr-4">Category</th>
-                <th className="py-2 pr-4">Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.byCategory.map((c) => (
-                <tr key={c.category} className="border-b border-black/5">
-                  <td className="py-3 pr-4 font-semibold text-charcoal">{c.category}</td>
-                  <td className="py-3 pr-4">{c.count.toLocaleString()}</td>
+        <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+            <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+              Breakdown by Category
+            </h3>
+            <table className="w-full min-w-[220px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+                  <th className="py-2 pr-4">Category</th>
+                  <th className="py-2 pr-4">Count</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {summary.byCategory.map((c) => (
+                  <tr key={c.category} className="border-b border-black/5">
+                    <td className="py-3 pr-4 font-semibold text-charcoal">{c.category}</td>
+                    <td className="py-3 pr-4">{c.count.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {summary.byState.length > 0 && (
+            <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+              <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+                Leads by State
+              </h3>
+              <table className="w-full min-w-[220px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+                    <th className="py-2 pr-4">State</th>
+                    <th className="py-2 pr-4">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.byState.map((s) => (
+                    <tr key={s.state} className="border-b border-black/5">
+                      <td className="py-3 pr-4 font-semibold text-charcoal">{s.state}</td>
+                      <td className="py-3 pr-4">{s.count.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {summary.byCarrier.length > 0 && (
+            <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+              <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+                Leads by Carrier
+              </h3>
+              <p className="mb-3 text-xs text-body-gray">
+                Derived from the agent&apos;s email domain (e.g.
+                @farmersagent.com → Farmers).
+              </p>
+              <table className="w-full min-w-[220px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+                    <th className="py-2 pr-4">Carrier</th>
+                    <th className="py-2 pr-4">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.byCarrier.map((c) => (
+                    <tr key={c.carrier} className="border-b border-black/5">
+                      <td className="py-3 pr-4 font-semibold text-charcoal">{c.carrier}</td>
+                      <td className="py-3 pr-4">{c.count.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -566,6 +626,7 @@ export default async function Home({
     channelBlendSummary,
     channelBlendAutomationStats,
     channelBlendUploads,
+    channelBlendFeedbackSummary,
     keapAutomationEvents,
     woodpeckerAiSummary,
     woodpeckerSentiment,
@@ -580,6 +641,7 @@ export default async function Home({
     getChannelBlendSummary(),
     getChannelBlendAutomationStats(),
     getChannelBlendUploads(),
+    getChannelBlendFeedbackSummary(),
     getKeapAutomationEventVolume(eventsRange),
     getWoodpeckerAiSummary(),
     getWoodpeckerSentiment(),
@@ -667,6 +729,7 @@ export default async function Home({
                 summary={channelBlendSummary}
                 automationStats={channelBlendAutomationStats}
                 uploads={channelBlendUploads}
+                feedbackSummary={channelBlendFeedbackSummary}
               />
             </SectionBlock>
           )}
