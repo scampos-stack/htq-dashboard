@@ -22,6 +22,29 @@ function formatPeriod(start: string | null, end: string | null) {
 function UploadRow({ upload }: { upload: ChannelBlendUploadRow }) {
   const router = useRouter();
   const [reverting, setReverting] = useState(false);
+  const [editingPeriod, setEditingPeriod] = useState(false);
+  const [savingPeriod, setSavingPeriod] = useState(false);
+  const [periodStart, setPeriodStart] = useState(upload.periodStart ?? "");
+  const [periodEnd, setPeriodEnd] = useState(upload.periodEnd ?? "");
+
+  async function handleSavePeriod() {
+    setSavingPeriod(true);
+    try {
+      const res = await fetch(`/api/channel-blend/uploads/${upload.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ periodStart, periodEnd }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to save period");
+      setEditingPeriod(false);
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to save period");
+    } finally {
+      setSavingPeriod(false);
+    }
+  }
 
   async function handleRevert() {
     if (
@@ -50,7 +73,46 @@ function UploadRow({ upload }: { upload: ChannelBlendUploadRow }) {
       <td className="py-3 pr-4 text-body-gray">
         {new Date(upload.uploadedAt).toLocaleString()}
       </td>
-      <td className="py-3 pr-4">{formatPeriod(upload.periodStart, upload.periodEnd)}</td>
+      <td className="py-3 pr-4">
+        {editingPeriod ? (
+          <div className="flex flex-wrap items-center gap-1">
+            <input
+              type="date"
+              value={periodStart}
+              onChange={(e) => setPeriodStart(e.target.value)}
+              className="rounded-lg border border-black/10 px-1.5 py-1 text-xs"
+            />
+            <span className="text-body-gray">–</span>
+            <input
+              type="date"
+              value={periodEnd}
+              onChange={(e) => setPeriodEnd(e.target.value)}
+              className="rounded-lg border border-black/10 px-1.5 py-1 text-xs"
+            />
+            <button
+              onClick={handleSavePeriod}
+              disabled={savingPeriod}
+              className="ml-1 text-xs font-semibold text-charcoal underline disabled:opacity-50"
+            >
+              {savingPeriod ? "…" : "Save"}
+            </button>
+            <button
+              onClick={() => setEditingPeriod(false)}
+              className="text-xs font-semibold text-body-gray underline"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setEditingPeriod(true)}
+            className="underline decoration-dotted underline-offset-2"
+            title="Click to set or edit the date range this list covers"
+          >
+            {formatPeriod(upload.periodStart, upload.periodEnd)}
+          </button>
+        )}
+      </td>
       <td className="py-3 pr-4">{upload.rowCount.toLocaleString()}</td>
       <td className="py-3 pr-4 whitespace-nowrap">
         {upload.revertedAt ? (
