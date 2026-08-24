@@ -25,6 +25,7 @@ import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
 import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistory";
 import { ChannelBlendFeedbackCard } from "@/components/ChannelBlendFeedbackCard";
+import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
@@ -469,55 +470,20 @@ function ChannelBlendSection({
           </div>
 
           {summary.byState.length > 0 && (
-            <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-              <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
-                Leads by State
-              </h3>
-              <table className="w-full min-w-[220px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-                    <th className="py-2 pr-4">State</th>
-                    <th className="py-2 pr-4">Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.byState.map((s) => (
-                    <tr key={s.state} className="border-b border-black/5">
-                      <td className="py-3 pr-4 font-semibold text-charcoal">{s.state}</td>
-                      <td className="py-3 pr-4">{s.count.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ExpandableBreakdownTable
+              title="Leads by State"
+              columnLabel="State"
+              rows={summary.byState.map((s) => ({ label: s.state, count: s.count }))}
+            />
           )}
 
           {summary.byCarrier.length > 0 && (
-            <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-              <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
-                Leads by Carrier
-              </h3>
-              <p className="mb-3 text-xs text-body-gray">
-                Derived from the agent&apos;s email domain (e.g.
-                @farmersagent.com → Farmers).
-              </p>
-              <table className="w-full min-w-[220px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-                    <th className="py-2 pr-4">Carrier</th>
-                    <th className="py-2 pr-4">Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.byCarrier.map((c) => (
-                    <tr key={c.carrier} className="border-b border-black/5">
-                      <td className="py-3 pr-4 font-semibold text-charcoal">{c.carrier}</td>
-                      <td className="py-3 pr-4">{c.count.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ExpandableBreakdownTable
+              title="Leads by Carrier"
+              description="Derived from the agent's email domain (e.g. @farmersagent.com → Farmers)."
+              columnLabel="Carrier"
+              rows={summary.byCarrier.map((c) => ({ label: c.carrier, count: c.count }))}
+            />
           )}
         </div>
       )}

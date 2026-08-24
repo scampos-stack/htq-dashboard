@@ -16,7 +16,7 @@ export function SourceNav() {
   const current = searchParams.get("source") ?? "all";
 
   return (
-    <nav className="flex shrink-0 flex-col gap-1 sm:w-52">
+    <nav className="sticky top-6 flex shrink-0 flex-col gap-1 self-start sm:w-52">
       {SOURCES.map((s) => {
         const active = current === s.value;
         return (
