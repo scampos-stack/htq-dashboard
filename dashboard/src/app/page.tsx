@@ -26,6 +26,7 @@ import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistory";
 import { ChannelBlendFeedbackCard } from "@/components/ChannelBlendFeedbackCard";
 import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable";
+import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
@@ -817,6 +818,8 @@ export default async function Home({
                             {new Date(c.stats.pulled_at).toLocaleDateString()}
                           </p>
                         )}
+
+                        {!rangeStats && <CampaignStepBreakdown steps={c.steps} />}
                       </div>
                     );
                   })}

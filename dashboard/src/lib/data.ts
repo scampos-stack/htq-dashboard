@@ -328,6 +328,18 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
   return submissions;
 }
 
+export type CampaignStepStat = {
+  step: number;
+  version: string | null;
+  sent: number;
+  delivered: number;
+  opened: number;
+  responded: number;
+  bounced: number;
+  interestedYes: number | null;
+  interestedMaybe: number | null;
+};
+
 export type CampaignWithStats = {
   id: number;
   source: string;
@@ -350,6 +362,7 @@ export type CampaignWithStats = {
     interested_no: number | null;
     pulled_at: string;
   } | null;
+  steps: CampaignStepStat[];
 };
 
 export type RangeStats = { sent: number; delivered: number; opened: number };
@@ -684,11 +697,15 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
   if (campaignsErr) throw campaignsErr;
   if (!campaigns?.length) return [];
 
+  // step is null for the whole-campaign aggregate snapshot — excluded here
+  // so a per-step row (added by the step-stats sync) can't get picked up as
+  // "the" stats for a campaign card just because it happens to sort first.
   const { data: snapshots, error: snapshotsErr } = await supabase
     .from("campaign_stats_snapshot")
     .select(
       "campaign_id, sent, delivered, opened, opened_rate, clicked, bounced, bounce_rate, responded, responded_rate, interested_yes, interested_maybe, interested_no, pulled_at"
     )
+    .is("step", null)
     .order("pulled_at", { ascending: false });
   if (snapshotsErr) throw snapshotsErr;
 
@@ -697,6 +714,41 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
     if (!latestByCampaign.has(row.campaign_id)) {
       latestByCampaign.set(row.campaign_id, row);
     }
+  }
+
+  const { data: stepSnapshots, error: stepSnapshotsErr } = await supabase
+    .from("campaign_stats_snapshot")
+    .select(
+      "campaign_id, step, version, sent, delivered, opened, responded, bounced, interested_yes, interested_maybe, pulled_at"
+    )
+    .not("step", "is", null)
+    .order("pulled_at", { ascending: false });
+  if (stepSnapshotsErr) throw stepSnapshotsErr;
+
+  const latestStepByKey = new Map<string, (typeof stepSnapshots)[number]>();
+  for (const row of stepSnapshots ?? []) {
+    const key = `${row.campaign_id}|${row.step}|${row.version ?? ""}`;
+    if (!latestStepByKey.has(key)) latestStepByKey.set(key, row);
+  }
+
+  const stepsByCampaign = new Map<number, CampaignStepStat[]>();
+  for (const row of latestStepByKey.values()) {
+    const list = stepsByCampaign.get(row.campaign_id) ?? [];
+    list.push({
+      step: row.step as number,
+      version: row.version,
+      sent: row.sent,
+      delivered: row.delivered,
+      opened: row.opened,
+      responded: row.responded,
+      bounced: row.bounced,
+      interestedYes: row.interested_yes,
+      interestedMaybe: row.interested_maybe,
+    });
+    stepsByCampaign.set(row.campaign_id, list);
+  }
+  for (const list of stepsByCampaign.values()) {
+    list.sort((a, b) => a.step - b.step || (a.version ?? "").localeCompare(b.version ?? ""));
   }
 
   return campaigns.map((c) => {
@@ -720,6 +772,7 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
             pulled_at: s.pulled_at,
           }
         : null,
+      steps: stepsByCampaign.get(c.id) ?? [],
     };
   });
 }

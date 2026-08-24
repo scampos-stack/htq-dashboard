@@ -17,6 +17,72 @@ async function wpFetch(path: string) {
   return res.json();
 }
 
+async function wpFetchV2(path: string, init?: RequestInit) {
+  const key = process.env.WOODPECKER_API_KEY;
+  if (!key) throw new Error("Missing WOODPECKER_API_KEY env var");
+
+  const res = await fetch(`https://api.woodpecker.co/rest/v2${path}`, {
+    ...init,
+    headers: {
+      "x-api-key": key,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Woodpecker API v2 ${path} -> ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
+type WoodpeckerReportRow = {
+  id: number;
+  step: number;
+  version: string | null;
+  sent?: number;
+  bounced?: number;
+  bounce_rate?: number;
+  opened?: number;
+  opened_rate?: number;
+  clicked?: number;
+  opt_out?: number;
+  opt_out_rate?: number;
+  delivered?: number;
+  responded?: number;
+  responded_rate?: number;
+  interested_yes?: number;
+  interested_maybe?: number;
+  interested_no?: number;
+};
+
+// Per-step numbers (sent/delivered/opened/etc broken down by each email in a
+// campaign's sequence) aren't in the plain campaign_list response — they
+// only come from this predefined report, which is generated async: kick it
+// off, then poll the hash until it's READY.
+// https://developers.woodpecker.co/docs/reports/Complete-statistics
+async function fetchStepStatsReport(): Promise<WoodpeckerReportRow[]> {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - 30); // API caps reports at the last 30 days
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+  const started = await wpFetchV2("/reports/complete_statistics_for_each_level_of_campaign", {
+    method: "POST",
+    body: JSON.stringify({ from: fmt(from), to: fmt(to) }),
+  });
+  const hash = started?.hash;
+  if (!hash) throw new Error("Woodpecker report request returned no hash");
+
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const poll = await wpFetchV2(`/reports/${hash}`);
+    if (poll.status === "READY") return poll.report?.data ?? [];
+    if (poll.status === "FAILED") throw new Error("Woodpecker report generation failed");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  throw new Error("Woodpecker report timed out waiting for READY status");
+}
+
 type WoodpeckerCampaign = {
   id: number;
   name: string;
@@ -43,6 +109,7 @@ type WoodpeckerCampaignDetail = WoodpeckerCampaign & {
 export async function syncWoodpecker(): Promise<{
   campaigns: number;
   snapshots: number;
+  stepSnapshots: number;
 }> {
   const supabase = supabaseServer();
 
@@ -112,5 +179,48 @@ export async function syncWoodpecker(): Promise<{
     .upsert(snapshotPayload, { onConflict: "campaign_id,step,version,pulled_at" });
   if (snapshotErr) throw snapshotErr;
 
-  return { campaigns: campaignsPayload.length, snapshots: snapshotPayload.length };
+  let stepSnapshotCount = 0;
+  try {
+    const reportRows = await fetchStepStatsReport();
+    const stepPayload = reportRows
+      .filter((r) => campaignIdByExternalId.has(String(r.id)))
+      .map((r) => ({
+        campaign_id: campaignIdByExternalId.get(String(r.id)),
+        step: r.step,
+        version: r.version || null,
+        sent: r.sent ?? 0,
+        bounced: r.bounced ?? 0,
+        bounce_rate: r.bounce_rate ?? null,
+        opened: r.opened ?? 0,
+        opened_rate: r.opened_rate ?? null,
+        clicked: r.clicked ?? 0,
+        opt_out: r.opt_out ?? 0,
+        opt_out_rate: r.opt_out_rate ?? null,
+        delivered: r.delivered ?? 0,
+        responded: r.responded ?? 0,
+        responded_rate: r.responded_rate ?? null,
+        interested_yes: r.interested_yes ?? null,
+        interested_maybe: r.interested_maybe ?? null,
+        interested_no: r.interested_no ?? null,
+      }));
+
+    if (stepPayload.length > 0) {
+      const { error: stepErr } = await supabase
+        .from("campaign_stats_snapshot")
+        .upsert(stepPayload, { onConflict: "campaign_id,step,version,pulled_at" });
+      if (stepErr) throw stepErr;
+      stepSnapshotCount = stepPayload.length;
+    }
+  } catch (err) {
+    // Step-level stats are additive on top of the aggregate snapshot already
+    // saved above — the reports API is async and has its own rate limits,
+    // so a hiccup here shouldn't fail the whole sync.
+    console.error("[sync] woodpecker step stats failed:", err);
+  }
+
+  return {
+    campaigns: campaignsPayload.length,
+    snapshots: snapshotPayload.length,
+    stepSnapshots: stepSnapshotCount,
+  };
 }
