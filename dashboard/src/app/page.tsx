@@ -10,6 +10,8 @@ import {
   getChannelBlendSummary,
   getChannelBlendAutomationStats,
   getKeapAutomationEventVolume,
+  getWoodpeckerAiSummary,
+  getWoodpeckerSentiment,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
 import { SourceNav } from "@/components/SourceNav";
@@ -21,6 +23,8 @@ import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
+import { ExecutiveSummaryCard } from "@/components/ExecutiveSummaryCard";
+import { SentimentBreakdown } from "@/components/SentimentBreakdown";
 
 function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING" || status === "PUBLISHED";
@@ -529,6 +533,8 @@ export default async function Home({
     channelBlendSummary,
     channelBlendAutomationStats,
     keapAutomationEvents,
+    woodpeckerAiSummary,
+    woodpeckerSentiment,
     rangeTotals,
   ] = await Promise.all([
     getCampaignsWithStats(),
@@ -540,6 +546,8 @@ export default async function Home({
     getChannelBlendSummary(),
     getChannelBlendAutomationStats(),
     getKeapAutomationEventVolume(eventsRange),
+    getWoodpeckerAiSummary(),
+    getWoodpeckerSentiment(),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
   ]);
 
@@ -636,6 +644,8 @@ export default async function Home({
               }
               accent="border-brand-green"
             >
+              <ExecutiveSummaryCard summary={woodpeckerAiSummary} />
+              <SentimentBreakdown sentiment={woodpeckerSentiment} />
               <div className="mb-4 flex flex-wrap justify-end gap-3">
                 {wpStatusOptions.length > 0 && (
                   <Suspense fallback={null}>

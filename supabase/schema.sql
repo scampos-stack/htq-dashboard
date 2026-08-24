@@ -118,3 +118,12 @@ create table if not exists keap_automation_events (
 );
 
 create index if not exists idx_keap_automation_events_date on keap_automation_events (occurred_at);
+
+-- Cached AI-generated executive summary, one row per dashboard scope
+-- (e.g. 'woodpecker'). Regenerated on Sync Now, not on every page view.
+create table if not exists ai_summaries (
+  id           bigint generated always as identity primary key,
+  scope        text not null unique,
+  summary      text not null,
+  generated_at timestamptz not null default now()
+);

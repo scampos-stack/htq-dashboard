@@ -1,5 +1,57 @@
 import { supabaseServer } from "./supabase-server";
 
+export type WoodpeckerAiSummary = {
+  summary: string;
+  generatedAt: string;
+} | null;
+
+export async function getWoodpeckerAiSummary(): Promise<WoodpeckerAiSummary> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("ai_summaries")
+    .select("summary, generated_at")
+    .eq("scope", "woodpecker")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { summary: data.summary, generatedAt: data.generated_at };
+}
+
+export type WoodpeckerSentiment = {
+  positive: number;
+  neutral: number;
+  negative: number;
+};
+
+export async function getWoodpeckerSentiment(): Promise<WoodpeckerSentiment> {
+  const supabase = supabaseServer();
+
+  const { data: campaigns, error: campaignsErr } = await supabase
+    .from("campaigns")
+    .select("id")
+    .eq("source", "woodpecker");
+  if (campaignsErr) throw campaignsErr;
+  const campaignIds = new Set((campaigns ?? []).map((c) => c.id));
+  if (campaignIds.size === 0) return { positive: 0, neutral: 0, negative: 0 };
+
+  const { data: snapshots, error: snapshotsErr } = await supabase
+    .from("campaign_stats_snapshot")
+    .select("campaign_id, interested_yes, interested_maybe, interested_no, pulled_at")
+    .order("pulled_at", { ascending: false });
+  if (snapshotsErr) throw snapshotsErr;
+
+  const seen = new Set<number>();
+  const totals = { positive: 0, neutral: 0, negative: 0 };
+  for (const row of snapshots ?? []) {
+    if (!campaignIds.has(row.campaign_id) || seen.has(row.campaign_id)) continue;
+    seen.add(row.campaign_id);
+    totals.positive += row.interested_yes ?? 0;
+    totals.neutral += row.interested_maybe ?? 0;
+    totals.negative += row.interested_no ?? 0;
+  }
+  return totals;
+}
+
 export type ChannelBlendSummary = {
   totalRows: number;
   appointmentsBooked: number;

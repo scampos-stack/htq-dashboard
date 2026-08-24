@@ -1,11 +1,23 @@
 import { NextResponse } from "next/server";
 import { syncWoodpecker } from "@/lib/sync-woodpecker";
 import { syncKeap, syncKeapEmailAggregate } from "@/lib/sync-keap";
+import { generateWoodpeckerExecutiveSummary } from "@/lib/generate-summary";
+
+async function syncWoodpeckerAndSummary() {
+  const result = await syncWoodpecker();
+  // Chained, not parallel — the summary reads the data syncWoodpecker just
+  // wrote. A failure here doesn't undo the sync, just skips the summary.
+  const summary = await generateWoodpeckerExecutiveSummary().catch((err) => {
+    console.error("[sync] ai summary failed:", err);
+    return { generated: false, reason: String(err) };
+  });
+  return { ...result, aiSummary: summary };
+}
 
 export async function POST() {
   try {
     const [woodpecker, keap, keapEmails] = await Promise.all([
-      syncWoodpecker().catch((err) => {
+      syncWoodpeckerAndSummary().catch((err) => {
         console.error("[sync] woodpecker failed:", err);
         return { error: String(err) };
       }),
