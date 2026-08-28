@@ -324,9 +324,9 @@ function KeapAutomationsList({
             {CATEGORY_LABELS[category] ?? category}{" "}
             <span className="font-normal text-body-gray">({list.length})</span>
           </h3>
-          <div className="overflow-x-auto">
+          <div className="max-h-72 overflow-y-auto overflow-x-auto">
             <table className="w-full min-w-[480px] border-collapse text-sm">
-              <thead>
+              <thead className="sticky top-0 bg-white">
                 <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
                   <th className="py-2 pr-4">Automation</th>
                   <th className="py-2 pr-4">Has Email</th>
