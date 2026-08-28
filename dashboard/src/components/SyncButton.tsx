@@ -15,7 +15,19 @@ export function SyncButton() {
     setMessage(null);
     try {
       const res = await fetch("/api/sync", { method: "POST" });
-      const data = await res.json();
+      const bodyText = await res.text();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let data: any;
+      try {
+        data = JSON.parse(bodyText);
+      } catch {
+        // Non-JSON body means the request never reached our route handler
+        // (e.g. a platform timeout page) — surface whatever text came back
+        // instead of a cryptic "Unexpected token" parse error.
+        throw new Error(
+          `Sync did not return a valid response (HTTP ${res.status}): ${bodyText.slice(0, 200)}`
+        );
+      }
       if (!res.ok || !data.ok) {
         throw new Error(data.error ?? "Sync failed");
       }

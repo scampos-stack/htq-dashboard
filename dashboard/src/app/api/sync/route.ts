@@ -5,9 +5,12 @@ import { syncZendesk } from "@/lib/sync-zendesk";
 import { generateWoodpeckerExecutiveSummary, generateZendeskTopicsSummary } from "@/lib/generate-summary";
 import { errorMessage } from "@/lib/error-message";
 
-// Zendesk's incremental export can take several polls across pages; give
-// the sync route more headroom than the platform default.
-export const maxDuration = 60;
+// Four integrations run in parallel here (Woodpecker incl. step-stats
+// polling, Keap, Zendesk incl. groups/tickets/metrics) and can combine to
+// run long — ask for the platform max; Vercel silently caps this to
+// whatever the plan actually allows, so it's safe to request more than
+// might be honored.
+export const maxDuration = 300;
 
 async function syncWoodpeckerAndSummary() {
   const result = await syncWoodpecker();
