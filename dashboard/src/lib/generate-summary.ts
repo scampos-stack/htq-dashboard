@@ -555,16 +555,21 @@ export async function generateAllSourcesDigest(range: ZendeskDateRange): Promise
       "Zendesk customer support team. Ground every statement strictly in " +
       "the numbers and summaries provided — never invent figures, and if " +
       "data for one side is thin, say so plainly rather than padding.\n\n" +
-      "Start with one line stating the period covered (use the period " +
-      "dates given in the data). Then write three short parts in plain " +
-      "language, no markdown headers or bold:\n" +
-      "1. Marketing performance — sent/open/click highlights across " +
+      "Output format matters — the reader's UI parses it into a scannable " +
+      "layout, so follow this exactly:\n" +
+      "Line 1: \"PERIOD: <start date> to <end date>\" using the period " +
+      "dates given in the data. Nothing else on that line.\n" +
+      "Then exactly three sections, each starting with a line of just " +
+      "\"## <Section Title>\" (that literal ## marker, nothing else on the " +
+      "line) followed by one short paragraph, plain language, no further " +
+      "markdown/bold/bullets inside the paragraph:\n" +
+      "## Marketing Performance — sent/open/click highlights across " +
       "Woodpecker and Keap, calling out anything notably strong or weak. " +
       "Note that Keap figures are account-wide latest totals, not strictly " +
       "scoped to the period, if you use them.\n" +
-      "2. Support health — ticket volume, CSAT, response/resolution time, " +
+      "## Support Health — ticket volume, CSAT, response/resolution time, " +
       "and which agent or group is carrying the most load.\n" +
-      "3. Cross-referenced insight — explicitly look for a genuine " +
+      "## Cross-Referenced Insight — explicitly look for a genuine " +
       "connection between the marketing and support data (e.g. rising " +
       "lead volume alongside more lead-quality complaints, or a support " +
       "topic that suggests a marketing/messaging problem). Only state a " +

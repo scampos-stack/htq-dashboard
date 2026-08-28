@@ -4,6 +4,38 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AllSourcesDigest } from "@/lib/data";
 
+type DigestSection = { title: string; body: string };
+
+// The prompt asks Claude for "PERIOD: ..." as line 1 and "## Section Title"
+// markers before each paragraph, so this renders as real headings instead
+// of one flat wall of text. Falls back to plain text for older digests
+// generated before this format existed.
+function parseDigest(text: string): { period: string | null; sections: DigestSection[] } {
+  const lines = text.split("\n");
+  let period: string | null = null;
+  const sections: DigestSection[] = [];
+  let current: DigestSection | null = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!period && line.startsWith("PERIOD:")) {
+      period = line.replace(/^PERIOD:\s*/, "");
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      current = { title: line.slice(3).trim(), body: "" };
+      sections.push(current);
+      continue;
+    }
+    if (!line) continue;
+    if (current) {
+      current.body = current.body ? `${current.body} ${line}` : line;
+    }
+  }
+
+  return { period, sections };
+}
+
 export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
   const router = useRouter();
   const [period, setPeriod] = useState("30");
@@ -89,10 +121,37 @@ export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
 
       {digest ? (
         <>
-          <p className="whitespace-pre-line text-sm leading-relaxed text-charcoal">
-            {digest.summary}
-          </p>
-          <p className="mt-3 text-xs text-body-gray">
+          {(() => {
+            const { period, sections } = parseDigest(digest.summary);
+            if (sections.length === 0) {
+              // Older digest generated before the "## Section" format existed.
+              return (
+                <p className="whitespace-pre-line text-sm leading-relaxed text-charcoal">
+                  {digest.summary}
+                </p>
+              );
+            }
+            return (
+              <div>
+                {period && (
+                  <span className="mb-4 inline-block rounded-full bg-charcoal/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-body-gray">
+                    {period}
+                  </span>
+                )}
+                <div className="flex flex-col gap-5">
+                  {sections.map((s) => (
+                    <div key={s.title}>
+                      <h4 className="mb-1.5 font-heading text-sm font-bold uppercase tracking-wide text-charcoal">
+                        {s.title}
+                      </h4>
+                      <p className="text-sm leading-relaxed text-charcoal">{s.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+          <p className="mt-4 text-xs text-body-gray">
             Generated {new Date(digest.generatedAt).toLocaleString()}
           </p>
         </>
