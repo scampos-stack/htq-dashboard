@@ -12,7 +12,8 @@ async function keapFetch(path: string) {
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Keap API ${path} -> ${res.status} ${res.statusText}`);
+    const body = await res.text().catch(() => "");
+    throw new Error(`Keap API ${path} -> ${res.status} ${res.statusText}${body ? `: ${body}` : ""}`);
   }
   return res.json();
 }

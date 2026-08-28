@@ -797,3 +797,65 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
     };
   });
 }
+
+export type ZendeskSummary = {
+  totalRows: number;
+  byStatus: { status: string; count: number }[];
+  topTags: { tag: string; count: number }[];
+  csat: { good: number; bad: number };
+  recent: {
+    id: number;
+    subject: string | null;
+    status: string | null;
+    priority: string | null;
+    requesterEmail: string | null;
+    createdAt: string | null;
+  }[];
+};
+
+export async function getZendeskSummary(): Promise<ZendeskSummary> {
+  const supabase = supabaseServer();
+
+  const { data, error } = await supabase
+    .from("zendesk_tickets")
+    .select("id, subject, status, priority, tags, requester_email, satisfaction_score, created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const byStatusMap = new Map<string, number>();
+  const tagMap = new Map<string, number>();
+  const csat = { good: 0, bad: 0 };
+
+  for (const r of rows) {
+    const status = r.status ?? "unknown";
+    byStatusMap.set(status, (byStatusMap.get(status) ?? 0) + 1);
+
+    for (const tag of r.tags ?? []) {
+      tagMap.set(tag, (tagMap.get(tag) ?? 0) + 1);
+    }
+
+    if (r.satisfaction_score === "good") csat.good += 1;
+    else if (r.satisfaction_score === "bad") csat.bad += 1;
+  }
+
+  return {
+    totalRows: rows.length,
+    byStatus: [...byStatusMap.entries()]
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count),
+    topTags: [...tagMap.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    csat,
+    recent: rows.slice(0, 25).map((r) => ({
+      id: r.id,
+      subject: r.subject,
+      status: r.status,
+      priority: r.priority,
+      requesterEmail: r.requester_email,
+      createdAt: r.created_at,
+    })),
+  };
+}

@@ -11,6 +11,7 @@ import {
   getChannelBlendAutomationStats,
   getChannelBlendUploads,
   getChannelBlendCategoryPatterns,
+  getZendeskSummary,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
@@ -29,6 +30,7 @@ import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable"
 import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { CampaignEmailContent } from "@/components/CampaignEmailContent";
 import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
+import { ZendeskSection } from "@/components/ZendeskSection";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
@@ -596,6 +598,7 @@ export default async function Home({
     channelBlendAutomationStats,
     channelBlendUploads,
     channelBlendPatterns,
+    zendeskSummary,
     keapAutomationEvents,
     woodpeckerAiSummary,
     woodpeckerSentiment,
@@ -611,6 +614,7 @@ export default async function Home({
     getChannelBlendAutomationStats(),
     getChannelBlendUploads(),
     getChannelBlendCategoryPatterns(),
+    getZendeskSummary(),
     getKeapAutomationEventVolume(eventsRange),
     getWoodpeckerAiSummary(),
     getWoodpeckerSentiment(),
@@ -634,6 +638,7 @@ export default async function Home({
   const showKeapAutomations = showAll || sourceParam === "keap_automations";
   const showKeapBroadcasts = showAll || sourceParam === "keap_broadcasts";
   const showChannelBlend = showAll || sourceParam === "channel_blend";
+  const showZendesk = showAll || sourceParam === "zendesk";
 
   return (
     <div className="flex-1 bg-mist">
@@ -700,6 +705,12 @@ export default async function Home({
                 uploads={channelBlendUploads}
                 patterns={channelBlendPatterns}
               />
+            </SectionBlock>
+          )}
+
+          {showZendesk && (
+            <SectionBlock title="Zendesk" accent="border-sky-500">
+              <ZendeskSection summary={zendeskSummary} />
             </SectionBlock>
           )}
 

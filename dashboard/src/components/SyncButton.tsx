@@ -38,7 +38,12 @@ export function SyncButton() {
       if (data.keap?.campaigns != null) {
         parts.push(`Keap: ${data.keap.campaigns} automations`);
       } else if (data.keap?.error) {
-        parts.push(`Keap failed`);
+        parts.push(`Keap failed: ${data.keap.error}`);
+      }
+      if (data.zendesk?.tickets != null) {
+        parts.push(`Zendesk: ${data.zendesk.tickets} tickets`);
+      } else if (data.zendesk?.error) {
+        parts.push(`Zendesk failed: ${data.zendesk.error}`);
       }
 
       setStatus("done");
