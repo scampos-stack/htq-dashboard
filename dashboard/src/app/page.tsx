@@ -399,12 +399,8 @@ function ChannelBlendSection({
   uploads: Awaited<ReturnType<typeof getChannelBlendUploads>>;
   patterns: Awaited<ReturnType<typeof getChannelBlendCategoryPatterns>>;
 }) {
-  return (
+  const overviewTab = (
     <div>
-      <ChannelBlendUpload />
-
-      <ChannelBlendUploadHistory uploads={uploads} />
-
       <ChannelBlendPatternsCard patterns={patterns} />
 
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
@@ -456,7 +452,7 @@ function ChannelBlendSection({
       )}
 
       {summary.byCategory.length > 0 && (
-        <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
             <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
               Breakdown by Category
@@ -497,31 +493,46 @@ function ChannelBlendSection({
           )}
         </div>
       )}
-
-      {summary.recent.length > 0 && (
-        <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-          <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
-            Recent Entries
-          </h3>
-          <table className="w-full min-w-[560px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-                <th className="py-2 pr-4">Category</th>
-                <th className="py-2 pr-4">Lead</th>
-                <th className="py-2 pr-4">State</th>
-                <th className="py-2 pr-4">Details</th>
-                <th className="py-2 pr-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.recent.map((r) => (
-                <DispositionRow key={r.id} row={r} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
+  );
+
+  const uploadTab = (
+    <div>
+      <ChannelBlendUpload />
+      <ChannelBlendUploadHistory uploads={uploads} />
+    </div>
+  );
+
+  const entriesTab = summary.recent.length > 0 && (
+    <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+      <table className="w-full min-w-[560px] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+            <th className="py-2 pr-4">Category</th>
+            <th className="py-2 pr-4">Lead</th>
+            <th className="py-2 pr-4">State</th>
+            <th className="py-2 pr-4">Details</th>
+            <th className="py-2 pr-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {summary.recent.map((r) => (
+            <DispositionRow key={r.id} row={r} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <SectionTabs
+      accent="border-violet-500"
+      tabs={[
+        { label: "Overview", content: overviewTab },
+        { label: "Upload", content: uploadTab },
+        { label: "Recent Entries", content: entriesTab },
+      ]}
+    />
   );
 }
 
