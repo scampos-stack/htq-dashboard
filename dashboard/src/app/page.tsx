@@ -810,7 +810,7 @@ export default async function Home({
                             Woodpecker data.
                           </p>
                         ) : (
-                          <div className="flex flex-col gap-4">
+                          <div className="flex flex-col gap-3">
                             {campaigns.map((c) => {
                     const rangeStats = rangeTotals?.get(c.id);
                     const sent = rangeStats ? rangeStats.sent : c.stats?.sent ?? 0;
@@ -829,17 +829,17 @@ export default async function Home({
                     return (
                       <div
                         key={c.id}
-                        className="rounded-3xl border-l-4 border-brand-green bg-white p-6 shadow-sm"
+                        className="rounded-3xl border-l-4 border-brand-green bg-white p-4 shadow-sm"
                       >
-                        <div className="mb-4 flex flex-wrap items-center gap-3">
-                          <h3 className="font-heading text-lg font-semibold text-charcoal">
+                        <div className="mb-3 flex flex-wrap items-center gap-3">
+                          <h3 className="font-heading text-base font-semibold text-charcoal">
                             {c.name}
                           </h3>
                           <StatusPill status={c.status} />
                           <CarrierEditor campaignId={c.id} carrier={c.carrier} />
                         </div>
 
-                        <div className="flex flex-wrap gap-x-8 gap-y-4">
+                        <div className="flex flex-wrap gap-x-8 gap-y-2">
                           <Metric size="sm" label="Sent" value={sent.toLocaleString()} />
                           <Metric size="sm" label="Open rate" value={openRate} />
                           <Metric
@@ -890,7 +890,7 @@ export default async function Home({
                         </div>
 
                         {c.stats && !rangeStats && (
-                          <p className="mt-3 text-xs text-body-gray">
+                          <p className="mt-2 text-xs text-body-gray">
                             Last pulled{" "}
                             {new Date(c.stats.pulled_at).toLocaleDateString()}
                           </p>

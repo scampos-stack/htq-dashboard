@@ -4,23 +4,23 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AllSourcesDigest } from "@/lib/data";
 
-type DigestBullet = { label: string | null; text: string };
+type DigestSection = { heading: string; bullets: string[] };
 
-const BULLET_ACCENT: Record<string, string> = {
-  Watch: "bg-status-warning",
-  Support: "bg-teal-500",
-  Marketing: "bg-brand-green",
-  Connection: "bg-violet-500",
+const SECTION_ACCENT: Record<string, string> = {
+  "Marketing Performance": "bg-brand-green",
+  "Support Health": "bg-teal-500",
+  "Cross-Referenced Insight": "bg-violet-500",
 };
 
-// The prompt asks Claude for "PERIOD: ..." as line 1, then exactly 4 "- "
-// bullets (Marketing/Support/Watch/Connection), one sentence each — parsed
-// here into a scannable list instead of a wall of paragraphs. Falls back to
-// plain text for older digests generated before this format existed.
-function parseDigest(text: string): { period: string | null; bullets: DigestBullet[] } {
+// The prompt asks Claude for "PERIOD: ..." as line 1, then 3 "## " section
+// headers each followed by 1-5 "- " bullets — parsed here into short bullet
+// lists per section instead of a wall of paragraphs. Falls back to plain
+// text for older digests generated before this format existed.
+function parseDigest(text: string): { period: string | null; sections: DigestSection[] } {
   const lines = text.split("\n");
   let period: string | null = null;
-  const bullets: DigestBullet[] = [];
+  const sections: DigestSection[] = [];
+  let current: DigestSection | null = null;
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
@@ -28,18 +28,17 @@ function parseDigest(text: string): { period: string | null; bullets: DigestBull
       period = line.replace(/^PERIOD:\s*/, "");
       continue;
     }
-    if (line.startsWith("- ")) {
-      const rest = line.slice(2).trim();
-      const match = rest.match(/^([A-Za-z ]{2,20}):\s*(.*)$/);
-      if (match) {
-        bullets.push({ label: match[1], text: match[2] });
-      } else {
-        bullets.push({ label: null, text: rest });
-      }
+    if (line.startsWith("## ")) {
+      current = { heading: line.slice(3).trim(), bullets: [] };
+      sections.push(current);
+      continue;
+    }
+    if (line.startsWith("- ") && current) {
+      current.bullets.push(line.slice(2).trim());
     }
   }
 
-  return { period, bullets };
+  return { period, sections: sections.filter((s) => s.bullets.length > 0) };
 }
 
 export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
@@ -128,9 +127,9 @@ export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
       {digest ? (
         <>
           {(() => {
-            const { period: coveredPeriod, bullets } = parseDigest(digest.summary);
-            if (bullets.length === 0) {
-              // Older digest generated before the bullet format existed.
+            const { period: coveredPeriod, sections } = parseDigest(digest.summary);
+            if (sections.length === 0) {
+              // Older digest generated before the section/bullet format existed.
               return (
                 <p className="whitespace-pre-line text-sm leading-relaxed text-charcoal">
                   {digest.summary}
@@ -144,18 +143,27 @@ export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
                     {coveredPeriod}
                   </span>
                 )}
-                <div className="flex flex-col gap-3">
-                  {bullets.map((b, i) => (
-                    <div key={i} className="flex items-start gap-2.5">
-                      <span
-                        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                          (b.label && BULLET_ACCENT[b.label]) || "bg-charcoal/20"
-                        }`}
-                      />
-                      <p className="text-sm leading-relaxed text-charcoal">
-                        {b.label && <span className="font-semibold">{b.label}: </span>}
-                        {b.text}
-                      </p>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                  {sections.map((s) => (
+                    <div key={s.heading}>
+                      <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-charcoal">
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${
+                            SECTION_ACCENT[s.heading] || "bg-charcoal/20"
+                          }`}
+                        />
+                        {s.heading}
+                      </h4>
+                      <ul className="flex flex-col gap-1.5">
+                        {s.bullets.map((b, i) => (
+                          <li
+                            key={i}
+                            className="text-sm leading-snug text-charcoal"
+                          >
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   ))}
                 </div>

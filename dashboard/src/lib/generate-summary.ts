@@ -548,33 +548,36 @@ export async function generateAllSourcesDigest(range: ZendeskDateRange): Promise
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 600,
+    max_tokens: 900,
     system:
       "You write a leadership-facing executive digest for a company that " +
       "runs cold-email lead generation (Woodpecker, Keap) and has a " +
       "Zendesk customer support team. This must be genuinely skimmable in " +
-      "under 15 seconds — a busy leader reads it once, not a report. " +
-      "Ground every statement strictly in the numbers and summaries " +
-      "provided — never invent figures.\n\n" +
+      "under 15 seconds — a busy leader scans short bullets, not " +
+      "paragraphs. Ground every statement strictly in the numbers and " +
+      "summaries provided — never invent figures.\n\n" +
       "Output format — the reader's UI parses this, so follow it exactly:\n" +
       "Line 1: \"PERIOD: <start date> to <end date>\" using the period " +
-      "dates given in the data. Nothing else on that line.\n" +
-      "Then exactly 4 lines, each starting with \"- \" and each ONE " +
-      "sentence (25 words max) — pick the single most important fact per " +
-      "line, not a list of stats:\n" +
-      "- Marketing: the single most important sent/open/click fact this " +
-      "period across Woodpecker and Keap.\n" +
-      "- Support: the single most important ticket volume/CSAT/response-" +
-      "time fact this period.\n" +
-      "- Watch: the one thing that most needs attention (a risk, an " +
-      "anomaly, a broken metric, a copy defect) — this is the line " +
-      "leadership should actually act on.\n" +
-      "- Connection: one sentence on a genuine link between the marketing " +
-      "and support data — if there truly isn't one this period, say " +
-      "\"No clear connection this period\" instead of forcing one.\n\n" +
-      "No extra bullets, no sub-bullets, no paragraphs, nothing after the " +
-      "4 lines. If a whole category has no usable data, say that in its " +
-      "one line rather than omitting the line or padding it.",
+      "dates given in the data. Nothing else on that line.\n\n" +
+      "Then exactly 3 sections, each a \"## \" header line followed by 1-5 " +
+      "bullet lines starting with \"- \". Each bullet is ONE short sentence " +
+      "(18 words max, one fact each) — never combine two facts into one " +
+      "bullet, never wrap into a second sentence:\n\n" +
+      "## Marketing Performance\n" +
+      "1-5 bullets on Woodpecker/Keap send-open-click performance this " +
+      "period — top performer, underperformer, and any sharp deviations, " +
+      "each as its own bullet.\n\n" +
+      "## Support Health\n" +
+      "1-5 bullets on ticket volume, disposition, CSAT/response time, and " +
+      "load distribution this period, each as its own bullet.\n\n" +
+      "## Cross-Referenced Insight\n" +
+      "1-5 bullets on genuine links between the marketing and support data " +
+      "this period — if there truly isn't one, a single bullet saying so " +
+      "is fine instead of forcing a connection.\n\n" +
+      "Use only as many bullets as are genuinely worth a leader's " +
+      "attention (never pad to 5). No sub-bullets, no paragraphs, nothing " +
+      "outside the 3 sections. If a whole section has no usable data, give " +
+      "it one bullet saying that rather than omitting the section.",
     messages: [
       {
         role: "user",
