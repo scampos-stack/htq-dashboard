@@ -767,32 +767,46 @@ export default async function Home({
               }
               accent="border-brand-green"
             >
-              <ExecutiveSummaryCard summary={woodpeckerAiSummary} />
-              <SentimentBreakdown sentiment={woodpeckerSentiment} />
-              <div className="mb-4 flex flex-wrap justify-end gap-3">
-                {wpStatusOptions.length > 0 && (
-                  <Suspense fallback={null}>
-                    <StatusFilter
-                      paramName="wpStatus"
-                      options={wpStatusOptions}
-                      label="Status"
-                    />
-                  </Suspense>
-                )}
-                {!showAll && (
-                  <Suspense fallback={null}>
-                    <RangeSelect />
-                  </Suspense>
-                )}
-              </div>
-              {campaigns.length === 0 ? (
-                <p className="text-body-gray">
-                  No campaigns yet — run the import scripts to load Woodpecker
-                  data.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  {campaigns.map((c) => {
+              <SectionTabs
+                accent="border-brand-green"
+                tabs={[
+                  {
+                    label: "Overview",
+                    content: (
+                      <div>
+                        <ExecutiveSummaryCard summary={woodpeckerAiSummary} />
+                        <SentimentBreakdown sentiment={woodpeckerSentiment} />
+                      </div>
+                    ),
+                  },
+                  {
+                    label: "Campaigns",
+                    content: (
+                      <div>
+                        <div className="mb-4 flex flex-wrap justify-end gap-3">
+                          {wpStatusOptions.length > 0 && (
+                            <Suspense fallback={null}>
+                              <StatusFilter
+                                paramName="wpStatus"
+                                options={wpStatusOptions}
+                                label="Status"
+                              />
+                            </Suspense>
+                          )}
+                          {!showAll && (
+                            <Suspense fallback={null}>
+                              <RangeSelect />
+                            </Suspense>
+                          )}
+                        </div>
+                        {campaigns.length === 0 ? (
+                          <p className="text-body-gray">
+                            No campaigns yet — run the import scripts to load
+                            Woodpecker data.
+                          </p>
+                        ) : (
+                          <div className="flex flex-col gap-4">
+                            {campaigns.map((c) => {
                     const rangeStats = rangeTotals?.get(c.id);
                     const sent = rangeStats ? rangeStats.sent : c.stats?.sent ?? 0;
                     const delivered = rangeStats
@@ -874,14 +888,19 @@ export default async function Home({
                           </p>
                         )}
 
-                        {!rangeStats && <CampaignStepBreakdown steps={c.steps} />}
-                        <CampaignEmailContent emailCopy={c.emailCopy} />
-                        <CampaignProspectsPanel campaignId={c.id} />
+                                  {!rangeStats && <CampaignStepBreakdown steps={c.steps} />}
+                                  <CampaignEmailContent emailCopy={c.emailCopy} />
+                                  <CampaignProspectsPanel campaignId={c.id} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    ),
+                  },
+                ]}
+              />
             </SectionBlock>
           )}
         </main>
