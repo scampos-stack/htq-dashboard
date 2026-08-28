@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { ZendeskSummary, ZendeskTopicsSummary } from "@/lib/data";
-import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable";
+import { HorizontalBarList } from "@/components/HorizontalBarList";
+import { DonutChart } from "@/components/DonutChart";
 import { ZendeskTopicsCard } from "@/components/ZendeskTopicsCard";
 import { ZendeskGroupedStatTable } from "@/components/ZendeskGroupedStatTable";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
@@ -111,15 +112,14 @@ export function ZendeskSection({
 
   const breakdownTab = (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <ExpandableBreakdownTable
+      <DonutChart
         title="Tickets by Status"
-        columnLabel="Status"
-        rows={summary.byStatus.map((s) => ({ label: s.status, count: s.count }))}
+        segments={summary.byStatus.map((s) => ({ label: s.status, value: s.count }))}
       />
       {summary.topTags.length > 0 && (
-        <ExpandableBreakdownTable
+        <HorizontalBarList
           title="Top Tags"
-          columnLabel="Tag"
+          accent="bg-teal-500"
           rows={summary.topTags.map((t) => ({ label: t.tag, count: t.count }))}
         />
       )}

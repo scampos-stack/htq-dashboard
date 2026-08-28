@@ -30,6 +30,10 @@ import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistory";
 import { ChannelBlendPatternsCard } from "@/components/ChannelBlendPatternsCard";
 import { HorizontalBarList } from "@/components/HorizontalBarList";
+import { VerticalBarChart } from "@/components/VerticalBarChart";
+import { DonutChart } from "@/components/DonutChart";
+import { Collapsible } from "@/components/Collapsible";
+import { JumpNav } from "@/components/JumpNav";
 import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { CampaignEmailContent } from "@/components/CampaignEmailContent";
 import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
@@ -71,17 +75,34 @@ function pct(numerator: number, denominator: number): string {
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
+// Marks a group of modules as manually-logged data vs. auto-synced
+// performance numbers — Sarah's feedback: mixing "someone typed this in" with
+// "the API reported this" in the same unlabeled row makes the manual entries
+// read as if they carry the same reliability as synced metrics.
+function GroupDivider({ label }: { label: string }) {
+  return (
+    <div className="mb-6 mt-2 flex items-center gap-3">
+      <span className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-body-gray">
+        {label}
+      </span>
+      <div className="h-px flex-1 bg-black/10" />
+    </div>
+  );
+}
+
 function SectionBlock({
+  id,
   title,
   accent,
   children,
 }: {
+  id?: string;
   title: string;
   accent: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="mb-10">
+    <section id={id} className="mb-10 scroll-mt-6">
       <div className={`mb-4 flex items-center gap-2 border-l-4 ${accent} pl-3`}>
         <h2 className="font-heading text-xl font-semibold text-charcoal">{title}</h2>
       </div>
@@ -91,10 +112,13 @@ function SectionBlock({
 }
 
 function SourceSummaryTable({
-  rows,
+  rows: allRows,
 }: {
   rows: Awaited<ReturnType<typeof getSourceSummary>>;
 }) {
+  // Not-connected sources are all-zero placeholder rows — nothing to read,
+  // just dead weight in a table meant to be scanned quickly.
+  const rows = allRows.filter((r) => r.connected);
   const grandTotal = rows.reduce(
     (acc, r) => ({
       sent: acc.sent + r.sent,
@@ -441,11 +465,10 @@ function ChannelBlendSection({
         )}
 
         {summary.byCarrier.length > 0 && (
-          <HorizontalBarList
+          <DonutChart
             title="Leads by Carrier"
             description="Derived from the agent's email domain (e.g. @farmersagent.com → Farmers)."
-            accent="bg-amber-500"
-            rows={summary.byCarrier.map((c) => ({ label: c.carrier, count: c.count }))}
+            segments={summary.byCarrier.map((c) => ({ label: c.carrier, value: c.count }))}
           />
         )}
       </div>
@@ -674,26 +697,45 @@ export default async function Home({
         <main className="min-w-0">
           {showOverview && (
             <>
-              <SectionBlock title="All Sources — Overview" accent="border-charcoal">
+              <JumpNav
+                items={[
+                  { id: "overview-all-sources", label: "All Sources", dot: "bg-charcoal" },
+                  { id: "overview-carrier", label: "By Carrier", dot: "bg-charcoal" },
+                  { id: "overview-vip", label: "VIP Submissions", dot: "bg-charcoal" },
+                ]}
+              />
+              <SectionBlock id="overview-all-sources" title="All Sources — Overview" accent="border-charcoal">
                 <AllSourcesDigestCard digest={allSourcesDigest} />
                 <div className="mb-4 flex justify-end">
                   <Suspense fallback={null}>
                     <RangeSelect />
                   </Suspense>
                 </div>
-                <div className="mb-6">
+                <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <DonutChart
+                    title="Source Mix (Sent)"
+                    segments={sourceSummary
+                      .filter((r) => r.connected)
+                      .map((r) => ({ label: r.label, value: r.sent }))}
+                  />
                   <VolumeTrendChart points={volumeTrend} />
                 </div>
-                <SourceSummaryTable rows={sourceSummary} />
+                <Collapsible label="full source breakdown table">
+                  <SourceSummaryTable rows={sourceSummary} />
+                </Collapsible>
               </SectionBlock>
 
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                <SectionBlock title="By Carrier" accent="border-charcoal">
-                  <CarrierSummaryTable rows={carrierSummary} />
+                <SectionBlock id="overview-carrier" title="By Carrier" accent="border-charcoal">
+                  <Collapsible label="carrier breakdown table">
+                    <CarrierSummaryTable rows={carrierSummary} />
+                  </Collapsible>
                 </SectionBlock>
 
-                <SectionBlock title="VIP Form Submissions" accent="border-charcoal">
-                  <VipSubmissionsWidget submissions={vipSubmissions} />
+                <SectionBlock id="overview-vip" title="VIP Form Submissions" accent="border-charcoal">
+                  <Collapsible label="VIP submissions table">
+                    <VipSubmissionsWidget submissions={vipSubmissions} />
+                  </Collapsible>
                 </SectionBlock>
               </div>
             </>
@@ -701,45 +743,67 @@ export default async function Home({
 
           {showMarketing && (
             <>
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                <SectionBlock title="Keap Automations" accent="border-amber-500">
-                  <SectionTabs
-                    accent="border-amber-500"
-                    tabs={[
-                      {
-                        label: "Performance",
-                        content: (
-                          <div>
-                            {keapStatusOptions.length > 0 && (
-                              <div className="mb-4 flex justify-end">
-                                <Suspense fallback={null}>
-                                  <StatusFilter
-                                    paramName="keapStatus"
-                                    options={keapStatusOptions}
-                                    label="Status"
-                                    defaultValue="PUBLISHED"
-                                  />
-                                </Suspense>
-                              </div>
-                            )}
-                            <KeapAutomationsList automations={keapAutomations} />
-                          </div>
-                        ),
-                      },
-                      {
-                        label: "Technical / Events",
-                        content: <KeapAutomationEventVolumeTable events={keapAutomationEvents} />,
-                      },
-                    ]}
-                  />
-                </SectionBlock>
+              <JumpNav
+                items={[
+                  { id: "marketing-keap-automations", label: "Keap Automations", dot: "bg-amber-500" },
+                  { id: "marketing-keap-broadcasts", label: "Keap Broadcasts", dot: "bg-sky-500" },
+                  { id: "marketing-channel-blend", label: "Channel Blend", dot: "bg-violet-500" },
+                  { id: "marketing-woodpecker", label: "Woodpecker", dot: "bg-brand-green" },
+                ]}
+              />
+              <GroupDivider label="Automated Performance" />
 
-                <SectionBlock title="Keap Broadcasts" accent="border-sky-500">
-                  <KeapBroadcastsList broadcasts={keapBroadcasts} />
-                </SectionBlock>
-              </div>
+              <SectionBlock id="marketing-keap-automations" title="Keap Automations" accent="border-amber-500">
+                <SectionTabs
+                  accent="border-amber-500"
+                  tabs={[
+                    {
+                      label: "Performance",
+                      content: (
+                        <div>
+                          {keapStatusOptions.length > 0 && (
+                            <div className="mb-4 flex justify-end">
+                              <Suspense fallback={null}>
+                                <StatusFilter
+                                  paramName="keapStatus"
+                                  options={keapStatusOptions}
+                                  label="Status"
+                                  defaultValue="PUBLISHED"
+                                />
+                              </Suspense>
+                            </div>
+                          )}
+                          {keapAutomations.length > 0 && (
+                            <div className="mb-4">
+                              <VerticalBarChart
+                                title="Active Contacts by Automation"
+                                description="By active contacts currently in the automation."
+                                accent="bg-amber-500"
+                                rows={[...keapAutomations]
+                                  .sort((a, b) => b.activeContacts - a.activeContacts)
+                                  .map((a) => ({ label: a.name, count: a.activeContacts }))}
+                              />
+                            </div>
+                          )}
+                          <KeapAutomationsList automations={keapAutomations} />
+                        </div>
+                      ),
+                    },
+                    {
+                      label: "Technical / Events",
+                      content: <KeapAutomationEventVolumeTable events={keapAutomationEvents} />,
+                    },
+                  ]}
+                />
+              </SectionBlock>
 
-              <SectionBlock title="Channel Blend" accent="border-violet-500">
+              <GroupDivider label="Manually Logged" />
+
+              <SectionBlock id="marketing-keap-broadcasts" title="Keap Broadcasts" accent="border-sky-500">
+                <KeapBroadcastsList broadcasts={keapBroadcasts} />
+              </SectionBlock>
+
+              <SectionBlock id="marketing-channel-blend" title="Channel Blend" accent="border-violet-500">
                 <ChannelBlendSection
                   summary={channelBlendSummary}
                   automationStats={channelBlendAutomationStats}
@@ -748,7 +812,10 @@ export default async function Home({
                 />
               </SectionBlock>
 
+              <GroupDivider label="Automated Performance" />
+
               <SectionBlock
+                id="marketing-woodpecker"
                 title={
                   rangeTotals
                     ? `Woodpecker Campaigns (last ${rangeParam} days)`
