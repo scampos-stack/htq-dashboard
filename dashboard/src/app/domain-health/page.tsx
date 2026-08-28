@@ -124,7 +124,7 @@ export default async function DomainHealthPage() {
     <div className="flex-1 bg-mist">
       <DashboardHeader active="domain-health" />
 
-      <main className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
+      <main className="mx-auto max-w-screen-2xl px-6 py-10 sm:px-10">
         <h2 className="mb-2 font-heading text-xl font-semibold text-charcoal">
           Domain Health — Woodpecker Sending Domains
         </h2>

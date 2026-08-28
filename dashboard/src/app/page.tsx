@@ -672,7 +672,7 @@ export default async function Home({
     <div className="flex-1 bg-mist">
       <DashboardHeader active="client" />
 
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10 sm:flex-row sm:px-10">
+      <div className="mx-auto flex max-w-screen-2xl flex-col gap-8 px-6 py-10 sm:flex-row sm:px-10">
         <Suspense fallback={null}>
           <SourceNav />
         </Suspense>
