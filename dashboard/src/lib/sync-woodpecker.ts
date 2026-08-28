@@ -1,5 +1,6 @@
 import { supabaseServer } from "./supabase-server";
 import { classifyCarrier } from "./classify-carrier";
+import { errorMessage } from "./error-message";
 
 const API_BASE = "https://api.woodpecker.co/rest/v1";
 
@@ -252,7 +253,7 @@ export async function syncWoodpecker(): Promise<{
     // Step-level stats are additive on top of the aggregate snapshot already
     // saved above — the reports API is async and has its own rate limits,
     // so a hiccup here shouldn't fail the whole sync.
-    stepStatsError = err instanceof Error ? err.message : String(err);
+    stepStatsError = errorMessage(err);
     console.error("[sync] woodpecker step stats failed:", err);
   }
 
@@ -297,7 +298,7 @@ export async function syncWoodpecker(): Promise<{
     }
   } catch (err) {
     // Prospect-level detail is additive too — don't let it fail the sync.
-    prospectsError = err instanceof Error ? err.message : String(err);
+    prospectsError = errorMessage(err);
     console.error("[sync] woodpecker prospects failed:", err);
   }
 

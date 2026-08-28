@@ -1,4 +1,5 @@
 import { supabaseServer } from "./supabase-server";
+import { errorMessage } from "./error-message";
 
 const CURSOR_KEY = "zendesk_tickets_cursor";
 const MAX_PAGES_PER_RUN = 10; // ~10 req/min rate limit on this endpoint
@@ -229,7 +230,7 @@ export async function syncZendesk(): Promise<{
   } catch (err) {
     // Additive on top of the ticket sync already saved above — don't fail
     // the whole sync over response-time metrics.
-    metricsError = err instanceof Error ? err.message : String(err);
+    metricsError = errorMessage(err);
     console.error("[sync] zendesk ticket metrics failed:", err);
   }
 

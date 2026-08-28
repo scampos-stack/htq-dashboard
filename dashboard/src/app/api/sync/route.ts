@@ -3,6 +3,7 @@ import { syncWoodpecker } from "@/lib/sync-woodpecker";
 import { syncKeap, syncKeapEmailAggregate } from "@/lib/sync-keap";
 import { syncZendesk } from "@/lib/sync-zendesk";
 import { generateWoodpeckerExecutiveSummary, generateZendeskTopicsSummary } from "@/lib/generate-summary";
+import { errorMessage } from "@/lib/error-message";
 
 // Zendesk's incremental export can take several polls across pages; give
 // the sync route more headroom than the platform default.
@@ -14,7 +15,7 @@ async function syncWoodpeckerAndSummary() {
   // wrote. A failure here doesn't undo the sync, just skips the summary.
   const summary = await generateWoodpeckerExecutiveSummary().catch((err) => {
     console.error("[sync] ai summary failed:", err);
-    return { generated: false, reason: String(err) };
+    return { generated: false, reason: errorMessage(err) };
   });
   return { ...result, aiSummary: summary };
 }
@@ -34,19 +35,19 @@ export async function POST() {
     const [woodpecker, keap, keapEmails, zendesk] = await Promise.all([
       syncWoodpeckerAndSummary().catch((err) => {
         console.error("[sync] woodpecker failed:", err);
-        return { error: String(err) };
+        return { error: errorMessage(err) };
       }),
       syncKeap().catch((err) => {
         console.error("[sync] keap failed:", err);
-        return { error: String(err) };
+        return { error: errorMessage(err) };
       }),
       syncKeapEmailAggregate().catch((err) => {
         console.error("[sync] keapEmails failed:", err);
-        return { error: String(err) };
+        return { error: errorMessage(err) };
       }),
       syncZendeskAndSummary().catch((err) => {
         console.error("[sync] zendesk failed:", err);
-        return { error: String(err) };
+        return { error: errorMessage(err) };
       }),
     ]);
     return NextResponse.json({ ok: true, woodpecker, keap, keapEmails, zendesk });
