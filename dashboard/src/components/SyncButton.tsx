@@ -45,6 +45,11 @@ export function SyncButton() {
       } else if (data.zendesk?.error) {
         parts.push(`Zendesk failed: ${data.zendesk.error}`);
       }
+      if (data.zendesk?.metricsError) {
+        parts.push(`Zendesk metrics failed: ${data.zendesk.metricsError}`);
+      } else if (data.zendesk?.metrics != null) {
+        parts.push(`Zendesk metrics: ${data.zendesk.metrics}`);
+      }
 
       setStatus("done");
       setMessage(parts.join(" · ") || "Synced");
