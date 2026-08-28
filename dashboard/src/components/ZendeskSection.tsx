@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import type { ZendeskSummary, ZendeskTopicsSummary } from "@/lib/data";
 import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable";
 import { ZendeskTopicsCard } from "@/components/ZendeskTopicsCard";
-import { ZendeskAgentTable } from "@/components/ZendeskAgentTable";
+import { ZendeskGroupedStatTable } from "@/components/ZendeskGroupedStatTable";
+import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
+import { SectionTabs } from "@/components/SectionTabs";
 import { formatDuration } from "@/lib/format-duration";
 
 function Metric({ label, value }: { label: string; value: string }) {
@@ -20,18 +23,29 @@ export function ZendeskSection({
   summary: ZendeskSummary;
   topicsSummary: ZendeskTopicsSummary;
 }) {
+  const rangeSelect = (
+    <div className="mb-4 flex justify-end">
+      <Suspense fallback={null}>
+        <ZendeskRangeSelect />
+      </Suspense>
+    </div>
+  );
+
   if (summary.totalRows === 0) {
     return (
-      <p className="text-body-gray">
-        No Zendesk tickets synced yet — click &quot;Sync Now&quot; to pull the last 90
-        days.
-      </p>
+      <div>
+        {rangeSelect}
+        <p className="text-body-gray">
+          No Zendesk tickets in this range — try widening it, or click
+          &quot;Sync Now&quot; if nothing has synced yet.
+        </p>
+      </div>
     );
   }
 
   const csatTotal = summary.csat.good + summary.csat.bad;
 
-  return (
+  const overviewTab = (
     <div>
       <ZendeskTopicsCard summary={topicsSummary} />
 
@@ -60,25 +74,6 @@ export function ZendeskSection({
         <div className="rounded-3xl border-l-4 border-teal-500 bg-white p-6 shadow-sm">
           <Metric label="Avg Resolution Time" value={formatDuration(summary.avgResolutionMinutes)} />
         </div>
-      </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <ExpandableBreakdownTable
-          title="Tickets by Status"
-          columnLabel="Status"
-          rows={summary.byStatus.map((s) => ({ label: s.status, count: s.count }))}
-        />
-        {summary.topTags.length > 0 && (
-          <ExpandableBreakdownTable
-            title="Top Tags"
-            columnLabel="Tag"
-            rows={summary.topTags.map((t) => ({ label: t.tag, count: t.count }))}
-          />
-        )}
-      </div>
-
-      <div className="mb-6">
-        <ZendeskAgentTable agents={summary.byAgent} />
       </div>
 
       <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
@@ -112,6 +107,44 @@ export function ZendeskSection({
           </tbody>
         </table>
       </div>
+    </div>
+  );
+
+  const teamTab = (
+    <div className="flex flex-col gap-5">
+      <ZendeskGroupedStatTable title="Tickets by Agent" columnLabel="Agent" rows={summary.byAgent} />
+      <ZendeskGroupedStatTable title="Tickets by Group" columnLabel="Group" rows={summary.byGroup} />
+    </div>
+  );
+
+  const breakdownTab = (
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <ExpandableBreakdownTable
+        title="Tickets by Status"
+        columnLabel="Status"
+        rows={summary.byStatus.map((s) => ({ label: s.status, count: s.count }))}
+      />
+      {summary.topTags.length > 0 && (
+        <ExpandableBreakdownTable
+          title="Top Tags"
+          columnLabel="Tag"
+          rows={summary.topTags.map((t) => ({ label: t.tag, count: t.count }))}
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <div>
+      {rangeSelect}
+      <SectionTabs
+        accent="border-teal-500"
+        tabs={[
+          { label: "Overview", content: overviewTab },
+          { label: "Agents & Groups", content: teamTab },
+          { label: "Status & Tags", content: breakdownTab },
+        ]}
+      />
     </div>
   );
 }

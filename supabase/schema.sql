@@ -178,6 +178,8 @@ create table if not exists zendesk_tickets (
   assignee_id                  integer,
   assignee_email                text,
   assignee_name                text,
+  group_id                     integer,
+  group_name                   text,
   satisfaction_score           text,
   satisfaction_comment         text,
   reply_time_minutes           integer, -- from GET /api/v2/ticket_metrics, joined in separately
@@ -190,6 +192,7 @@ create table if not exists zendesk_tickets (
 create index if not exists idx_zendesk_tickets_status on zendesk_tickets (status);
 create index if not exists idx_zendesk_tickets_updated on zendesk_tickets (updated_at);
 create index if not exists idx_zendesk_tickets_assignee on zendesk_tickets (assignee_id);
+create index if not exists idx_zendesk_tickets_group on zendesk_tickets (group_id);
 
 -- Generic key/value store for sync cursors — currently just Zendesk's
 -- incremental-export end_time, so the next sync picks up where the last

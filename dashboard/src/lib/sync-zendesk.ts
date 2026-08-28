@@ -37,6 +37,7 @@ type ZendeskTicket = {
   tags: string[];
   requester_id: number;
   assignee_id: number | null;
+  group_id: number | null;
   created_at: string;
   updated_at: string;
   satisfaction_rating?: { score?: string; comment?: string | null } | null;
@@ -47,6 +48,22 @@ type ZendeskUser = {
   email: string | null;
   name: string | null;
 };
+
+type ZendeskGroup = {
+  id: number;
+  name: string;
+};
+
+// Groups (QC, Sales, Customer Service, Agent Services, etc.) are a small,
+// slow-changing list — fetched once per sync run rather than relying on
+// per-page sideloading on the incremental export.
+async function fetchGroups(): Promise<Map<number, string>> {
+  const { subdomain } = zdCredentials();
+  const data: { groups?: ZendeskGroup[] } = await zdFetch(
+    `https://${subdomain}.zendesk.com/api/v2/groups.json`
+  );
+  return new Map((data.groups ?? []).map((g) => [g.id, g.name]));
+}
 
 type IncrementalResponse = {
   tickets?: ZendeskTicket[];
@@ -154,6 +171,10 @@ export async function syncZendesk(): Promise<{
   let lastEndTime = startTime;
 
   const supabase = supabaseServer();
+  const groupById = await fetchGroups().catch((err) => {
+    console.error("[sync] zendesk groups lookup failed:", err);
+    return new Map<number, string>();
+  });
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const data: IncrementalResponse = await zdFetch(url);
@@ -178,6 +199,8 @@ export async function syncZendesk(): Promise<{
           assignee_id: t.assignee_id ?? null,
           assignee_email: assignee?.email ?? null,
           assignee_name: assignee?.name ?? null,
+          group_id: t.group_id ?? null,
+          group_name: t.group_id != null ? groupById.get(t.group_id) ?? null : null,
           satisfaction_score: t.satisfaction_rating?.score ?? null,
           satisfaction_comment: t.satisfaction_rating?.comment ?? null,
           created_at: t.created_at,

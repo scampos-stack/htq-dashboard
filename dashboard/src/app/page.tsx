@@ -32,6 +32,7 @@ import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { CampaignEmailContent } from "@/components/CampaignEmailContent";
 import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
 import { ZendeskSection } from "@/components/ZendeskSection";
+import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
@@ -588,6 +589,25 @@ export default async function Home({
           return { since };
         })();
 
+  const zendeskRangeParam =
+    typeof params.zendeskRange === "string" ? params.zendeskRange : "30";
+  const zendeskFromParam =
+    typeof params.zendeskFrom === "string" ? params.zendeskFrom : "";
+  const zendeskToParam =
+    typeof params.zendeskTo === "string" ? params.zendeskTo : "";
+
+  const zendeskRange =
+    zendeskRangeParam === "custom" && zendeskFromParam
+      ? {
+          since: new Date(zendeskFromParam),
+          until: zendeskToParam ? new Date(zendeskToParam) : undefined,
+        }
+      : (() => {
+          const since = new Date();
+          since.setDate(since.getDate() - Number(zendeskRangeParam || "30"));
+          return { since };
+        })();
+
   const [
     allCampaigns,
     sourceSummary,
@@ -616,7 +636,7 @@ export default async function Home({
     getChannelBlendAutomationStats(),
     getChannelBlendUploads(),
     getChannelBlendCategoryPatterns(),
-    getZendeskSummary(),
+    getZendeskSummary(zendeskRange),
     getZendeskTopicsSummary(),
     getKeapAutomationEventVolume(eventsRange),
     getWoodpeckerAiSummary(),
