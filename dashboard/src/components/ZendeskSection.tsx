@@ -1,5 +1,6 @@
-import type { ZendeskSummary } from "@/lib/data";
+import type { ZendeskSummary, ZendeskTopicsSummary } from "@/lib/data";
 import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable";
+import { ZendeskTopicsCard } from "@/components/ZendeskTopicsCard";
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
@@ -10,7 +11,27 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ZendeskSection({ summary }: { summary: ZendeskSummary }) {
+// Zendesk gives minutes; render as e.g. "4h 12m" or "2d 3h" so it's
+// readable at a glance instead of a raw minute count.
+function formatDuration(minutes: number | null): string {
+  if (minutes == null) return "—";
+  const totalMinutes = Math.round(minutes);
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const mins = totalMinutes % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+export function ZendeskSection({
+  summary,
+  topicsSummary,
+}: {
+  summary: ZendeskSummary;
+  topicsSummary: ZendeskTopicsSummary;
+}) {
   if (summary.totalRows === 0) {
     return (
       <p className="text-body-gray">
@@ -24,11 +45,13 @@ export function ZendeskSection({ summary }: { summary: ZendeskSummary }) {
 
   return (
     <div>
+      <ZendeskTopicsCard summary={topicsSummary} />
+
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm">
+        <div className="rounded-3xl border-l-4 border-teal-500 bg-white p-6 shadow-sm">
           <Metric label="Total Tickets" value={summary.totalRows.toLocaleString()} />
         </div>
-        <div className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm">
+        <div className="rounded-3xl border-l-4 border-teal-500 bg-white p-6 shadow-sm">
           <Metric
             label="Open / Pending"
             value={(
@@ -42,6 +65,12 @@ export function ZendeskSection({ summary }: { summary: ZendeskSummary }) {
             label="CSAT (Good)"
             value={csatTotal > 0 ? `${Math.round((summary.csat.good / csatTotal) * 100)}%` : "—"}
           />
+        </div>
+        <div className="rounded-3xl border-l-4 border-teal-500 bg-white p-6 shadow-sm">
+          <Metric label="Avg First Response" value={formatDuration(summary.avgReplyMinutes)} />
+        </div>
+        <div className="rounded-3xl border-l-4 border-teal-500 bg-white p-6 shadow-sm">
+          <Metric label="Avg Resolution Time" value={formatDuration(summary.avgResolutionMinutes)} />
         </div>
       </div>
 

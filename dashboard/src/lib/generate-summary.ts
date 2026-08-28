@@ -304,3 +304,132 @@ export async function generateChannelBlendPatternsSummary(): Promise<{
 
   return { generated: true, categories: generatedCount };
 }
+
+type ZendeskTicketEntry = {
+  subject: string | null;
+  description: string | null;
+  tags: string[];
+};
+
+// Capped to the most recent 500 tickets — plenty for a topic distribution,
+// and keeps token usage/cost bounded as ticket volume grows.
+async function getZendeskTicketDigest(): Promise<ZendeskTicketEntry[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("zendesk_tickets")
+    .select("subject, description, tags")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) throw error;
+
+  return (data ?? []).map((r) => ({
+    subject: r.subject,
+    description: r.description ? stripHtml(r.description).slice(0, 300) : null,
+    tags: r.tags ?? [],
+  }));
+}
+
+async function getPreviousZendeskTopicsSummary(): Promise<string | null> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("ai_summaries")
+    .select("summary")
+    .eq("scope", "zendesk_topics")
+    .maybeSingle();
+  if (error) throw error;
+  return data?.summary ?? null;
+}
+
+// Unlike Channel Blend's categories (real spreadsheet tabs), Zendesk
+// tickets have no clean category field — the same complaint shows up as
+// "not enough leads", "lead quantity", "leads amount", etc. So this asks
+// Claude to normalize wording into canonical topics itself, rather than
+// just counting raw phrases or tags (the system-generated tags like
+// trigger_myfriends/no_survey aren't meaningful topic labels either).
+export async function generateZendeskTopicsSummary(): Promise<{
+  generated: boolean;
+  reason?: string;
+}> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { generated: false, reason: "ANTHROPIC_API_KEY not configured" };
+  }
+
+  const digest = await getZendeskTicketDigest();
+  if (digest.length === 0) {
+    return { generated: false, reason: "No Zendesk tickets synced yet" };
+  }
+
+  const previous = await getPreviousZendeskTopicsSummary();
+  const client = new Anthropic({ apiKey });
+
+  const response = await client.messages.create({
+    model: "claude-opus-5",
+    max_tokens: 1536,
+    system:
+      "You analyze support ticket subjects/descriptions from a " +
+      "lead-generation company's Zendesk. Different tickets describe the " +
+      "same underlying issue with different wording (e.g. \"not enough " +
+      "leads\", \"lead quantity\", \"leads amount\" are all the same " +
+      "complaint about lead volume) — your job is to normalize that " +
+      "wording into a small set of canonical topic categories, not just " +
+      "count raw phrases or repeat the raw tags verbatim. Ground every " +
+      "topic strictly in the ticket text provided — never invent a topic " +
+      "or count not supported by the data.\n\n" +
+      "Output the top 5 recurring topics, ranked by frequency, each as a " +
+      "short one-line bullet: a plain-language canonical label for the " +
+      "topic, the approximate count of tickets matching it, and one " +
+      "representative example subject/phrase from the data. If fewer than " +
+      "5 genuinely distinct topics exist, list only as many as are real. " +
+      "Plain text only — no markdown headers, no bold, no nested " +
+      "sub-bullets.\n\n" +
+      (previous
+        ? "You are also given the PREVIOUS topics summary. After the " +
+          "bullets, add ONE short sentence noting a genuine, data-grounded " +
+          "shift since then (a topic becoming more or less common) — only " +
+          "if there's a real difference. If topics are essentially " +
+          "unchanged, say so briefly instead of inventing a shift."
+        : "This is the first summary generated — there's no previous " +
+          "version to compare against, so don't mention a comparison."),
+    messages: [
+      {
+        role: "user",
+        content:
+          "Here are recent Zendesk ticket subjects/descriptions/tags " +
+          "(JSON). Identify the top 5 recurring topics, normalizing varied " +
+          "wording into the same category where it means the same thing:" +
+          "\n\n" + JSON.stringify(digest, null, 2) +
+          (previous ? `\n\nPrevious summary:\n\n${previous}` : ""),
+      },
+    ],
+  });
+
+  const textBlock = response.content.find(
+    (b): b is Anthropic.TextBlock => b.type === "text"
+  );
+  const summary = textBlock?.text?.trim();
+  if (!summary) {
+    console.error(
+      "[zendesk topics] no text content, stop_reason:",
+      response.stop_reason,
+      JSON.stringify(response.content)
+    );
+    return {
+      generated: false,
+      reason: `Claude returned no text content (stop_reason: ${response.stop_reason})`,
+    };
+  }
+
+  const supabase = supabaseServer();
+  const { error } = await supabase.from("ai_summaries").upsert(
+    {
+      scope: "zendesk_topics",
+      summary,
+      generated_at: new Date().toISOString(),
+    },
+    { onConflict: "scope" }
+  );
+  if (error) throw error;
+
+  return { generated: true };
+}

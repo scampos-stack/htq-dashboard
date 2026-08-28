@@ -803,6 +803,8 @@ export type ZendeskSummary = {
   byStatus: { status: string; count: number }[];
   topTags: { tag: string; count: number }[];
   csat: { good: number; bad: number };
+  avgReplyMinutes: number | null;
+  avgResolutionMinutes: number | null;
   recent: {
     id: number;
     subject: string | null;
@@ -813,12 +815,19 @@ export type ZendeskSummary = {
   }[];
 };
 
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
 export async function getZendeskSummary(): Promise<ZendeskSummary> {
   const supabase = supabaseServer();
 
   const { data, error } = await supabase
     .from("zendesk_tickets")
-    .select("id, subject, status, priority, tags, requester_email, satisfaction_score, created_at")
+    .select(
+      "id, subject, status, priority, tags, requester_email, satisfaction_score, reply_time_minutes, full_resolution_time_minutes, created_at"
+    )
     .order("created_at", { ascending: false });
   if (error) throw error;
 
@@ -826,6 +835,8 @@ export async function getZendeskSummary(): Promise<ZendeskSummary> {
   const byStatusMap = new Map<string, number>();
   const tagMap = new Map<string, number>();
   const csat = { good: 0, bad: 0 };
+  const replyTimes: number[] = [];
+  const resolutionTimes: number[] = [];
 
   for (const r of rows) {
     const status = r.status ?? "unknown";
@@ -837,6 +848,9 @@ export async function getZendeskSummary(): Promise<ZendeskSummary> {
 
     if (r.satisfaction_score === "good") csat.good += 1;
     else if (r.satisfaction_score === "bad") csat.bad += 1;
+
+    if (r.reply_time_minutes != null) replyTimes.push(r.reply_time_minutes);
+    if (r.full_resolution_time_minutes != null) resolutionTimes.push(r.full_resolution_time_minutes);
   }
 
   return {
@@ -849,6 +863,8 @@ export async function getZendeskSummary(): Promise<ZendeskSummary> {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10),
     csat,
+    avgReplyMinutes: average(replyTimes),
+    avgResolutionMinutes: average(resolutionTimes),
     recent: rows.slice(0, 25).map((r) => ({
       id: r.id,
       subject: r.subject,
@@ -858,4 +874,21 @@ export async function getZendeskSummary(): Promise<ZendeskSummary> {
       createdAt: r.created_at,
     })),
   };
+}
+
+export type ZendeskTopicsSummary = {
+  summary: string;
+  generatedAt: string;
+} | null;
+
+export async function getZendeskTopicsSummary(): Promise<ZendeskTopicsSummary> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("ai_summaries")
+    .select("summary, generated_at")
+    .eq("scope", "zendesk_topics")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { summary: data.summary, generatedAt: data.generated_at };
 }

@@ -12,6 +12,7 @@ import {
   getChannelBlendUploads,
   getChannelBlendCategoryPatterns,
   getZendeskSummary,
+  getZendeskTopicsSummary,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
@@ -599,6 +600,7 @@ export default async function Home({
     channelBlendUploads,
     channelBlendPatterns,
     zendeskSummary,
+    zendeskTopicsSummary,
     keapAutomationEvents,
     woodpeckerAiSummary,
     woodpeckerSentiment,
@@ -615,6 +617,7 @@ export default async function Home({
     getChannelBlendUploads(),
     getChannelBlendCategoryPatterns(),
     getZendeskSummary(),
+    getZendeskTopicsSummary(),
     getKeapAutomationEventVolume(eventsRange),
     getWoodpeckerAiSummary(),
     getWoodpeckerSentiment(),
@@ -709,8 +712,8 @@ export default async function Home({
           )}
 
           {showZendesk && (
-            <SectionBlock title="Zendesk" accent="border-sky-500">
-              <ZendeskSection summary={zendeskSummary} />
+            <SectionBlock title="Zendesk" accent="border-teal-500">
+              <ZendeskSection summary={zendeskSummary} topicsSummary={zendeskTopicsSummary} />
             </SectionBlock>
           )}
 

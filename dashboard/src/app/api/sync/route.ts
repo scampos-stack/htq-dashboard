@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { syncWoodpecker } from "@/lib/sync-woodpecker";
 import { syncKeap, syncKeapEmailAggregate } from "@/lib/sync-keap";
 import { syncZendesk } from "@/lib/sync-zendesk";
-import { generateWoodpeckerExecutiveSummary } from "@/lib/generate-summary";
+import { generateWoodpeckerExecutiveSummary, generateZendeskTopicsSummary } from "@/lib/generate-summary";
 
 // Zendesk's incremental export can take several polls across pages; give
 // the sync route more headroom than the platform default.
@@ -17,6 +17,16 @@ async function syncWoodpeckerAndSummary() {
     return { generated: false, reason: String(err) };
   });
   return { ...result, aiSummary: summary };
+}
+
+async function syncZendeskAndSummary() {
+  const result = await syncZendesk();
+  if (result.tickets > 0) {
+    await generateZendeskTopicsSummary().catch((err) => {
+      console.error("[sync] zendesk topics summary failed:", err);
+    });
+  }
+  return result;
 }
 
 export async function POST() {
@@ -34,7 +44,7 @@ export async function POST() {
         console.error("[sync] keapEmails failed:", err);
         return { error: String(err) };
       }),
-      syncZendesk().catch((err) => {
+      syncZendeskAndSummary().catch((err) => {
         console.error("[sync] zendesk failed:", err);
         return { error: String(err) };
       }),

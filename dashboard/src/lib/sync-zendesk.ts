@@ -80,12 +80,71 @@ async function setCursor(endTime: number) {
   if (error) throw error;
 }
 
+type ZendeskTicketMetric = {
+  ticket_id: number;
+  reply_time_in_minutes?: { calendar?: number | null } | null;
+  full_resolution_time_in_minutes?: { calendar?: number | null } | null;
+};
+
+type TicketMetricsResponse = {
+  ticket_metrics?: ZendeskTicketMetric[];
+  meta?: { has_more?: boolean };
+  links?: { next?: string | null };
+};
+
+// Reply/resolution time isn't on the plain ticket object — it's a separate
+// bulk endpoint, joined back onto already-synced tickets by id. Only
+// updates rows that already exist (never inserts), so it can't create a
+// partial ticket row.
+async function syncZendeskTicketMetrics(): Promise<{ metrics: number }> {
+  const { subdomain } = zdCredentials();
+  const supabase = supabaseServer();
+
+  const { data: existing, error: existingErr } = await supabase
+    .from("zendesk_tickets")
+    .select("id");
+  if (existingErr) throw existingErr;
+  const existingIds = new Set((existing ?? []).map((r) => r.id));
+  if (existingIds.size === 0) return { metrics: 0 };
+
+  let url = `https://${subdomain}.zendesk.com/api/v2/ticket_metrics?page[size]=100`;
+  let total = 0;
+
+  for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
+    const data: TicketMetricsResponse = await zdFetch(url);
+    const metrics = data.ticket_metrics ?? [];
+
+    const payload = metrics
+      .filter((m) => existingIds.has(m.ticket_id))
+      .map((m) => ({
+        id: m.ticket_id,
+        reply_time_minutes: m.reply_time_in_minutes?.calendar ?? null,
+        full_resolution_time_minutes: m.full_resolution_time_in_minutes?.calendar ?? null,
+      }));
+
+    if (payload.length > 0) {
+      const { error } = await supabase.from("zendesk_tickets").upsert(payload, { onConflict: "id" });
+      if (error) throw error;
+      total += payload.length;
+    }
+
+    if (!data.meta?.has_more || !data.links?.next) break;
+    url = data.links.next;
+  }
+
+  return { metrics: total };
+}
+
 // Uses Zendesk's Incremental Ticket Export API rather than the plain list
 // endpoint — it's built exactly for this (sync jobs that pick up only
 // what's new/changed since last run via a time cursor), instead of
 // re-pulling every ticket on every sync.
 // https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/
-export async function syncZendesk(): Promise<{ tickets: number }> {
+export async function syncZendesk(): Promise<{
+  tickets: number;
+  metrics: number;
+  metricsError?: string;
+}> {
   const { subdomain } = zdCredentials();
 
   const startTime = await getCursor();
@@ -133,5 +192,22 @@ export async function syncZendesk(): Promise<{ tickets: number }> {
   }
 
   await setCursor(lastEndTime);
-  return { tickets: total };
+
+  let metricsCount = 0;
+  let metricsError: string | undefined;
+  try {
+    const result = await syncZendeskTicketMetrics();
+    metricsCount = result.metrics;
+  } catch (err) {
+    // Additive on top of the ticket sync already saved above — don't fail
+    // the whole sync over response-time metrics.
+    metricsError = err instanceof Error ? err.message : String(err);
+    console.error("[sync] zendesk ticket metrics failed:", err);
+  }
+
+  return {
+    tickets: total,
+    metrics: metricsCount,
+    ...(metricsError ? { metricsError } : {}),
+  };
 }

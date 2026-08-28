@@ -167,19 +167,21 @@ create table if not exists ai_summaries (
 
 -- Zendesk support tickets, synced incrementally (see sync-zendesk.ts).
 create table if not exists zendesk_tickets (
-  id                   bigint primary key, -- Zendesk's own ticket id, not identity-generated
-  subject              text,
-  description          text,
-  status               text,
-  priority             text,
-  tags                 text[] not null default '{}',
-  requester_email      text,
-  requester_name       text,
-  satisfaction_score   text,
-  satisfaction_comment text,
-  created_at           timestamptz,
-  updated_at           timestamptz,
-  synced_at            timestamptz not null default now()
+  id                           bigint primary key, -- Zendesk's own ticket id, not identity-generated
+  subject                      text,
+  description                  text,
+  status                       text,
+  priority                     text,
+  tags                         text[] not null default '{}',
+  requester_email              text,
+  requester_name               text,
+  satisfaction_score           text,
+  satisfaction_comment         text,
+  reply_time_minutes           integer, -- from GET /api/v2/ticket_metrics, joined in separately
+  full_resolution_time_minutes integer,
+  created_at                   timestamptz,
+  updated_at                   timestamptz,
+  synced_at                    timestamptz not null default now()
 );
 
 create index if not exists idx_zendesk_tickets_status on zendesk_tickets (status);
