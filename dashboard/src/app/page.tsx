@@ -47,12 +47,17 @@ function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING" || status === "PUBLISHED";
   return (
     <span
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
         isRunning
           ? "bg-brand-green/15 text-brand-green-dark"
           : "bg-charcoal/10 text-charcoal"
       }`}
     >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          isRunning ? "bg-brand-green-dark" : "bg-body-gray"
+        }`}
+      />
       {status ?? "UNKNOWN"}
     </span>
   );
