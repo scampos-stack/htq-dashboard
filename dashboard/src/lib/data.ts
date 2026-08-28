@@ -798,6 +798,13 @@ export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
   });
 }
 
+export type ZendeskAgentStat = {
+  agent: string;
+  count: number;
+  avgReplyMinutes: number | null;
+  avgResolutionMinutes: number | null;
+};
+
 export type ZendeskSummary = {
   totalRows: number;
   byStatus: { status: string; count: number }[];
@@ -805,6 +812,7 @@ export type ZendeskSummary = {
   csat: { good: number; bad: number };
   avgReplyMinutes: number | null;
   avgResolutionMinutes: number | null;
+  byAgent: ZendeskAgentStat[];
   recent: {
     id: number;
     subject: string | null;
@@ -826,7 +834,7 @@ export async function getZendeskSummary(): Promise<ZendeskSummary> {
   const { data, error } = await supabase
     .from("zendesk_tickets")
     .select(
-      "id, subject, status, priority, tags, requester_email, satisfaction_score, reply_time_minutes, full_resolution_time_minutes, created_at"
+      "id, subject, status, priority, tags, requester_email, assignee_email, assignee_name, satisfaction_score, reply_time_minutes, full_resolution_time_minutes, created_at"
     )
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -837,6 +845,10 @@ export async function getZendeskSummary(): Promise<ZendeskSummary> {
   const csat = { good: 0, bad: 0 };
   const replyTimes: number[] = [];
   const resolutionTimes: number[] = [];
+  const agentMap = new Map<
+    string,
+    { count: number; replyTimes: number[]; resolutionTimes: number[] }
+  >();
 
   for (const r of rows) {
     const status = r.status ?? "unknown";
@@ -851,6 +863,13 @@ export async function getZendeskSummary(): Promise<ZendeskSummary> {
 
     if (r.reply_time_minutes != null) replyTimes.push(r.reply_time_minutes);
     if (r.full_resolution_time_minutes != null) resolutionTimes.push(r.full_resolution_time_minutes);
+
+    const agent = r.assignee_name || r.assignee_email || "Unassigned";
+    const agentEntry = agentMap.get(agent) ?? { count: 0, replyTimes: [], resolutionTimes: [] };
+    agentEntry.count += 1;
+    if (r.reply_time_minutes != null) agentEntry.replyTimes.push(r.reply_time_minutes);
+    if (r.full_resolution_time_minutes != null) agentEntry.resolutionTimes.push(r.full_resolution_time_minutes);
+    agentMap.set(agent, agentEntry);
   }
 
   return {
@@ -865,6 +884,14 @@ export async function getZendeskSummary(): Promise<ZendeskSummary> {
     csat,
     avgReplyMinutes: average(replyTimes),
     avgResolutionMinutes: average(resolutionTimes),
+    byAgent: [...agentMap.entries()]
+      .map(([agent, e]) => ({
+        agent,
+        count: e.count,
+        avgReplyMinutes: average(e.replyTimes),
+        avgResolutionMinutes: average(e.resolutionTimes),
+      }))
+      .sort((a, b) => b.count - a.count),
     recent: rows.slice(0, 25).map((r) => ({
       id: r.id,
       subject: r.subject,

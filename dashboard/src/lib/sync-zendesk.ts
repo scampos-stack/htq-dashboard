@@ -36,6 +36,7 @@ type ZendeskTicket = {
   priority: string | null;
   tags: string[];
   requester_id: number;
+  assignee_id: number | null;
   created_at: string;
   updated_at: string;
   satisfaction_rating?: { score?: string; comment?: string | null } | null;
@@ -164,6 +165,7 @@ export async function syncZendesk(): Promise<{
     if (tickets.length > 0) {
       const payload = tickets.map((t) => {
         const requester = userById.get(t.requester_id);
+        const assignee = t.assignee_id != null ? userById.get(t.assignee_id) : undefined;
         return {
           id: t.id,
           subject: t.subject,
@@ -173,6 +175,9 @@ export async function syncZendesk(): Promise<{
           tags: t.tags ?? [],
           requester_email: requester?.email ?? null,
           requester_name: requester?.name ?? null,
+          assignee_id: t.assignee_id ?? null,
+          assignee_email: assignee?.email ?? null,
+          assignee_name: assignee?.name ?? null,
           satisfaction_score: t.satisfaction_rating?.score ?? null,
           satisfaction_comment: t.satisfaction_rating?.comment ?? null,
           created_at: t.created_at,
