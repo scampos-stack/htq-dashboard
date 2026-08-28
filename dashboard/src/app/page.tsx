@@ -35,6 +35,7 @@ import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
 import { ZendeskSection } from "@/components/ZendeskSection";
 import { AllSourcesDigestCard } from "@/components/AllSourcesDigestCard";
 import { SectionTabs } from "@/components/SectionTabs";
+import { Metric } from "@/components/Metric";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
@@ -57,14 +58,6 @@ function StatusPill({ status }: { status: string | null }) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col">
-      <span className="text-2xl font-bold text-charcoal font-heading">{value}</span>
-      <span className="text-xs uppercase tracking-wide text-body-gray">{label}</span>
-    </div>
-  );
-}
 
 function pct(numerator: number, denominator: number): string {
   if (!denominator) return "—";

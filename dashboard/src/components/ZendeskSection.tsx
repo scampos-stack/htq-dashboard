@@ -5,16 +5,8 @@ import { ZendeskTopicsCard } from "@/components/ZendeskTopicsCard";
 import { ZendeskGroupedStatTable } from "@/components/ZendeskGroupedStatTable";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
 import { SectionTabs } from "@/components/SectionTabs";
+import { Metric } from "@/components/Metric";
 import { formatDuration } from "@/lib/format-duration";
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col">
-      <span className="text-2xl font-bold text-charcoal font-heading">{value}</span>
-      <span className="text-xs uppercase tracking-wide text-body-gray">{label}</span>
-    </div>
-  );
-}
 
 export function ZendeskSection({
   summary,
