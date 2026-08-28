@@ -415,6 +415,45 @@ export async function getDailyRangeTotals(
   return totals;
 }
 
+export type DailyVolumePoint = { date: string; sent: number; opened: number };
+
+// Account-wide daily send/open trend across all non-excluded Woodpecker
+// campaigns — the first actual chart on any page besides Domain Health.
+export async function getDailyVolumeTrend(days: number): Promise<DailyVolumePoint[]> {
+  const supabase = supabaseServer();
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceStr = since.toISOString().slice(0, 10);
+
+  const { data: campaigns, error: campaignsErr } = await supabase
+    .from("campaigns")
+    .select("id, exclude_from_metrics")
+    .eq("source", "woodpecker");
+  if (campaignsErr) throw campaignsErr;
+  const eligibleIds = new Set(
+    (campaigns ?? []).filter((c) => !c.exclude_from_metrics).map((c) => c.id)
+  );
+
+  const { data, error } = await supabase
+    .from("campaign_stats_daily")
+    .select("campaign_id, sent_date, sent, opened")
+    .gte("sent_date", sinceStr);
+  if (error) throw error;
+
+  const byDate = new Map<string, { sent: number; opened: number }>();
+  for (const row of data ?? []) {
+    if (!eligibleIds.has(row.campaign_id)) continue;
+    const entry = byDate.get(row.sent_date) ?? { sent: 0, opened: 0 };
+    entry.sent += row.sent;
+    entry.opened += row.opened;
+    byDate.set(row.sent_date, entry);
+  }
+
+  return [...byDate.entries()]
+    .map(([date, v]) => ({ date, sent: v.sent, opened: v.opened }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export type SourceSummaryRow = {
   key: string;
   label: string;

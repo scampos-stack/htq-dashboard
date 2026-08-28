@@ -14,6 +14,7 @@ import {
   getZendeskSummary,
   getZendeskTopicsSummary,
   getAllSourcesDigest,
+  getDailyVolumeTrend,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
@@ -34,6 +35,7 @@ import { CampaignEmailContent } from "@/components/CampaignEmailContent";
 import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
 import { ZendeskSection } from "@/components/ZendeskSection";
 import { AllSourcesDigestCard } from "@/components/AllSourcesDigestCard";
+import { VolumeTrendChart } from "@/components/VolumeTrendChart";
 import { SectionTabs } from "@/components/SectionTabs";
 import { Metric } from "@/components/Metric";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
@@ -578,8 +580,10 @@ export default async function Home({
   const rangeParam = typeof params.range === "string" ? params.range : "all";
   const sourceParam =
     typeof params.source === "string" ? params.source : "all";
+  // Defaults to Published only — Sam's review flagged unpublished
+  // automations as noise cluttering the list; "all" is still one click away.
   const keapStatusParam =
-    typeof params.keapStatus === "string" ? params.keapStatus : "all";
+    typeof params.keapStatus === "string" ? params.keapStatus : "PUBLISHED";
   const wpStatusParam =
     typeof params.wpStatus === "string" ? params.wpStatus : "all";
   const eventsRangeParam =
@@ -638,6 +642,7 @@ export default async function Home({
     woodpeckerAiSummary,
     woodpeckerSentiment,
     rangeTotals,
+    volumeTrend,
   ] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
@@ -656,6 +661,7 @@ export default async function Home({
     getWoodpeckerAiSummary(),
     getWoodpeckerSentiment(),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
+    getDailyVolumeTrend(rangeParam === "all" ? 30 : Number(rangeParam)),
   ]);
 
   const wpStatusOptions = [...new Set(allCampaigns.map((c) => c.status).filter(Boolean))] as string[];
@@ -695,6 +701,9 @@ export default async function Home({
                   <RangeSelect />
                 </Suspense>
               </div>
+              <div className="mb-6">
+                <VolumeTrendChart points={volumeTrend} />
+              </div>
               <SourceSummaryTable rows={sourceSummary} />
             </SectionBlock>
           )}
@@ -727,6 +736,7 @@ export default async function Home({
                                 paramName="keapStatus"
                                 options={keapStatusOptions}
                                 label="Status"
+                                defaultValue="PUBLISHED"
                               />
                             </Suspense>
                           </div>
