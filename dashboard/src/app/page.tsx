@@ -850,13 +850,13 @@ export default async function Home({
                           ) : (
                             <div className="flex flex-col">
                               <span className="flex items-center gap-2 text-sm font-bold text-charcoal font-heading">
-                                <span className="text-[#0ca30c]">
+                                <span className="text-status-positive">
                                   {(c.stats?.interested_yes ?? 0).toLocaleString()}
                                 </span>
-                                <span className="text-[#fab219]">
+                                <span className="text-status-warning">
                                   {(c.stats?.interested_maybe ?? 0).toLocaleString()}
                                 </span>
-                                <span className="text-[#d03b3b]">
+                                <span className="text-status-negative">
                                   {(c.stats?.interested_no ?? 0).toLocaleString()}
                                 </span>
                               </span>

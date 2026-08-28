@@ -11,6 +11,16 @@
 
   --background: #ffffff;
   --foreground: var(--charcoal);
+
+  /* Single source of truth for data status colors (positive/negative/
+     warning) — previously duplicated as raw hex in page.tsx, domain-health,
+     and SentimentBreakdown separately, three places to keep in sync. Kept
+     deliberately distinct from --brand-green so a color change to one never
+     silently changes the other, per the design review's note that a data
+     indicator color must never double as a brand color. */
+  --status-positive: #0ca30c;
+  --status-warning: #fab219;
+  --status-negative: #d03b3b;
 }
 
 @theme inline {
@@ -21,6 +31,9 @@
   --color-charcoal: var(--charcoal);
   --color-mist: var(--mist);
   --color-body-gray: var(--body-gray);
+  --color-status-positive: var(--status-positive);
+  --color-status-warning: var(--status-warning);
+  --color-status-negative: var(--status-negative);
   --font-sans: var(--font-body);
   --font-heading: var(--font-heading);
 }

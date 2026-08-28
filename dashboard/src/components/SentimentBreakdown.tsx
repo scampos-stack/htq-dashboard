@@ -1,9 +1,9 @@
 import type { WoodpeckerSentiment } from "@/lib/data";
 
-const COLORS = {
-  positive: "#0ca30c",
-  neutral: "#fab219",
-  negative: "#d03b3b",
+const COLOR_CLASSES = {
+  positive: "bg-status-positive",
+  neutral: "bg-status-warning",
+  negative: "bg-status-negative",
 };
 
 export function SentimentBreakdown({ sentiment }: { sentiment: WoodpeckerSentiment }) {
@@ -27,10 +27,8 @@ export function SentimentBreakdown({ sentiment }: { sentiment: WoodpeckerSentime
               sentiment[key] > 0 ? (
                 <div
                   key={key}
-                  style={{
-                    width: `${(sentiment[key] / total) * 100}%`,
-                    backgroundColor: COLORS[key],
-                  }}
+                  className={COLOR_CLASSES[key]}
+                  style={{ width: `${(sentiment[key] / total) * 100}%` }}
                 />
               ) : null
             )}
@@ -38,10 +36,7 @@ export function SentimentBreakdown({ sentiment }: { sentiment: WoodpeckerSentime
           <div className="flex flex-wrap gap-6">
             {(["positive", "neutral", "negative"] as const).map((key) => (
               <div key={key} className="flex items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: COLORS[key] }}
-                />
+                <span className={`h-2.5 w-2.5 rounded-full ${COLOR_CLASSES[key]}`} />
                 <span className="text-sm font-semibold text-charcoal">
                   {sentiment[key].toLocaleString()}
                 </span>

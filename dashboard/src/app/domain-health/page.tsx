@@ -7,9 +7,9 @@ import { DomainNoteEditor } from "@/components/DomainNoteEditor";
 import { DashboardHeader } from "@/components/DashboardHeader";
 
 const STATUS = {
-  good: { color: "#0ca30c", label: "Good" },
-  warning: { color: "#fab219", label: "Watch" },
-  critical: { color: "#d03b3b", label: "Critical" },
+  good: { color: "var(--status-positive)", label: "Good" },
+  warning: { color: "var(--status-warning)", label: "Watch" },
+  critical: { color: "var(--status-negative)", label: "Critical" },
 };
 
 function bounceStatus(rate: number | null): keyof typeof STATUS {
