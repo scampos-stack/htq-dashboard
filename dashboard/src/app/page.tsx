@@ -34,6 +34,7 @@ import { CampaignEmailContent } from "@/components/CampaignEmailContent";
 import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
 import { ZendeskSection } from "@/components/ZendeskSection";
 import { AllSourcesDigestCard } from "@/components/AllSourcesDigestCard";
+import { SectionTabs } from "@/components/SectionTabs";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
@@ -703,19 +704,34 @@ export default async function Home({
 
           {showKeapAutomations && (
             <SectionBlock title="Keap Automations" accent="border-amber-500">
-              {keapStatusOptions.length > 0 && (
-                <div className="mb-4 flex justify-end">
-                  <Suspense fallback={null}>
-                    <StatusFilter
-                      paramName="keapStatus"
-                      options={keapStatusOptions}
-                      label="Status"
-                    />
-                  </Suspense>
-                </div>
-              )}
-              <KeapAutomationEventVolumeTable events={keapAutomationEvents} />
-              <KeapAutomationsList automations={keapAutomations} />
+              <SectionTabs
+                accent="border-amber-500"
+                tabs={[
+                  {
+                    label: "Performance",
+                    content: (
+                      <div>
+                        {keapStatusOptions.length > 0 && (
+                          <div className="mb-4 flex justify-end">
+                            <Suspense fallback={null}>
+                              <StatusFilter
+                                paramName="keapStatus"
+                                options={keapStatusOptions}
+                                label="Status"
+                              />
+                            </Suspense>
+                          </div>
+                        )}
+                        <KeapAutomationsList automations={keapAutomations} />
+                      </div>
+                    ),
+                  },
+                  {
+                    label: "Technical / Events",
+                    content: <KeapAutomationEventVolumeTable events={keapAutomationEvents} />,
+                  },
+                ]}
+              />
             </SectionBlock>
           )}
 
