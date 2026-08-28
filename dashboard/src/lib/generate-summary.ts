@@ -267,6 +267,15 @@ async function generateChannelBlendCategoryPatterns(
       reason: `Claude returned no text content for "${category}" (stop_reason: ${response.stop_reason})`,
     };
   }
+  if (response.stop_reason === "max_tokens") {
+    console.error(
+      `[channel-blend patterns:${category}] response hit max_tokens, discarding truncated summary`
+    );
+    return {
+      generated: false,
+      reason: `Claude's response for "${category}" was cut off (hit max_tokens) — not saving a truncated summary`,
+    };
+  }
 
   const supabase = supabaseServer();
   const { error } = await supabase.from("ai_summaries").upsert(

@@ -51,11 +51,11 @@ export function ChannelBlendPatternsCard({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
           {patterns.map((p) => (
             <div
               key={p.category}
-              className="rounded-3xl border-l-4 border-violet-500 bg-white p-5 shadow-sm"
+              className="rounded-3xl border-l-4 border-violet-500 bg-white p-4 shadow-sm"
             >
               <h4 className="mb-2 font-heading text-sm font-semibold text-charcoal">
                 {p.category}

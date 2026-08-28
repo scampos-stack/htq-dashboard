@@ -29,7 +29,7 @@ import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
 import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
 import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistory";
 import { ChannelBlendPatternsCard } from "@/components/ChannelBlendPatternsCard";
-import { ExpandableBreakdownTable } from "@/components/ExpandableBreakdownTable";
+import { HorizontalBarList } from "@/components/HorizontalBarList";
 import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { CampaignEmailContent } from "@/components/CampaignEmailContent";
 import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
@@ -401,19 +401,17 @@ function ChannelBlendSection({
 }) {
   const overviewTab = (
     <div>
-      <ChannelBlendPatternsCard patterns={patterns} />
-
-      <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-4 shadow-sm">
           <Metric label="Total Rows" value={summary.totalRows.toLocaleString()} />
         </div>
-        <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
+        <div className="rounded-3xl border-l-4 border-violet-500 bg-white p-4 shadow-sm">
           <Metric
             label="Appointments Booked"
             value={summary.appointmentsBooked.toLocaleString()}
           />
         </div>
-        <div className="rounded-3xl border-l-4 border-amber-500 bg-white p-6 shadow-sm">
+        <div className="rounded-3xl border-l-4 border-amber-500 bg-white p-4 shadow-sm">
           <Metric
             label="Follow-up Emails Sent"
             value={automationStats.totalEmailsSent.toLocaleString()}
@@ -421,76 +419,60 @@ function ChannelBlendSection({
         </div>
       </div>
 
+      <div className="mb-4">
+        <ChannelBlendPatternsCard patterns={patterns} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {summary.byCategory.length > 0 && (
+          <HorizontalBarList
+            title="Breakdown by Category"
+            accent="bg-violet-500"
+            rows={summary.byCategory.map((c) => ({ label: c.category, count: c.count }))}
+          />
+        )}
+
+        {summary.byState.length > 0 && (
+          <HorizontalBarList
+            title="Leads by State"
+            accent="bg-violet-500"
+            rows={summary.byState.map((s) => ({ label: s.state, count: s.count }))}
+          />
+        )}
+
+        {summary.byCarrier.length > 0 && (
+          <HorizontalBarList
+            title="Leads by Carrier"
+            description="Derived from the agent's email domain (e.g. @farmersagent.com → Farmers)."
+            accent="bg-amber-500"
+            rows={summary.byCarrier.map((c) => ({ label: c.carrier, count: c.count }))}
+          />
+        )}
+      </div>
+
       {automationStats.recentEvents.length > 0 && (
-        <div className="mb-6 overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-          <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
+        <div className="mt-4 overflow-x-auto rounded-3xl bg-white p-4 shadow-sm">
+          <h3 className="mb-3 font-heading text-sm font-semibold text-charcoal">
             Recent Follow-up Emails (Channel Blend → Keap Automation)
           </h3>
           <table className="w-full min-w-[320px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-                <th className="py-2 pr-4">Contact Email</th>
-                <th className="py-2 pr-4">Sent At</th>
+                <th className="py-1.5 pr-4">Contact Email</th>
+                <th className="py-1.5 pr-4">Sent At</th>
               </tr>
             </thead>
             <tbody>
-              {automationStats.recentEvents.map((e, i) => (
+              {automationStats.recentEvents.slice(0, 5).map((e, i) => (
                 <tr key={i} className="border-b border-black/5">
-                  <td className="py-3 pr-4">{e.contactEmail ?? "—"}</td>
-                  <td className="py-3 pr-4 text-body-gray">
+                  <td className="py-1.5 pr-4">{e.contactEmail ?? "—"}</td>
+                  <td className="py-1.5 pr-4 text-body-gray">
                     {new Date(e.occurredAt).toLocaleString()}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-3 text-xs text-body-gray">
-            From the &quot;Channel Blend - Email Request&quot; automation&apos;s
-            webhook step — ties a spreadsheet email request to the actual send.
-          </p>
-        </div>
-      )}
-
-      {summary.byCategory.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-            <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
-              Breakdown by Category
-            </h3>
-            <table className="w-full min-w-[220px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-                  <th className="py-2 pr-4">Category</th>
-                  <th className="py-2 pr-4">Count</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.byCategory.map((c) => (
-                  <tr key={c.category} className="border-b border-black/5">
-                    <td className="py-3 pr-4 font-semibold text-charcoal">{c.category}</td>
-                    <td className="py-3 pr-4">{c.count.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {summary.byState.length > 0 && (
-            <ExpandableBreakdownTable
-              title="Leads by State"
-              columnLabel="State"
-              rows={summary.byState.map((s) => ({ label: s.state, count: s.count }))}
-            />
-          )}
-
-          {summary.byCarrier.length > 0 && (
-            <ExpandableBreakdownTable
-              title="Leads by Carrier"
-              description="Derived from the agent's email domain (e.g. @farmersagent.com → Farmers)."
-              columnLabel="Carrier"
-              rows={summary.byCarrier.map((c) => ({ label: c.carrier, count: c.count }))}
-            />
-          )}
         </div>
       )}
     </div>
