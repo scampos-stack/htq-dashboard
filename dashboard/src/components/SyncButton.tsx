@@ -47,6 +47,13 @@ export function SyncButton() {
       } else if (data.woodpecker?.prospects != null) {
         parts.push(`Prospects: ${data.woodpecker.prospects}`);
       }
+      if (data.keapEmails?.capped) {
+        parts.push(`Keap emails: ${data.keapEmails.sent} (hit page cap, real total is higher)`);
+      } else if (data.keapEmails?.sent != null) {
+        parts.push(`Keap emails: ${data.keapEmails.sent}`);
+      } else if (data.keapEmails?.error) {
+        parts.push(`Keap emails failed: ${data.keapEmails.error}`);
+      }
       if (data.keap?.campaigns != null) {
         parts.push(`Keap: ${data.keap.campaigns} automations`);
       } else if (data.keap?.error) {

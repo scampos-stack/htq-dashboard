@@ -101,7 +101,7 @@ type KeapEmail = {
 // endpoint; Keap's own dashboard shows bounce rates well under 1%).
 export async function syncKeapEmailAggregate(
   days = 30
-): Promise<{ sent: number; opened: number; clicked: number }> {
+): Promise<{ sent: number; opened: number; clicked: number; capped: boolean }> {
   const supabase = supabaseServer();
 
   const since = new Date();
@@ -112,8 +112,14 @@ export async function syncKeapEmailAggregate(
   let opened = 0;
   let clicked = 0;
   let path = `/emails?limit=1000&since_sent_date=${sinceParam}`;
+  let capped = false;
 
-  for (let page = 0; page < 20 && path; page++) {
+  // 300 pages * 1000/page = 300k emails/period — generous headroom over the
+  // old 20-page (20,000) cap, which was silently truncating real volume
+  // (a suspiciously round 20,000 sent/delivered was the tell). Still bounded
+  // rather than unbounded, so a runaway account can't hang the sync forever.
+  const MAX_PAGES = 300;
+  for (let page = 0; page < MAX_PAGES && path; page++) {
     const data = await keapFetch(path);
     const emails: KeapEmail[] = data.emails ?? [];
     sent += emails.length;
@@ -122,6 +128,12 @@ export async function syncKeapEmailAggregate(
 
     if (!data.next) break;
     path = data.next.replace(API_BASE, "");
+    if (page === MAX_PAGES - 1) {
+      capped = true;
+      console.error(
+        `[sync] keap email aggregate hit the ${MAX_PAGES}-page cap — real total is higher than ${sent}`
+      );
+    }
   }
 
   const externalId = "__all_emails__";
@@ -157,5 +169,5 @@ export async function syncKeapEmailAggregate(
     );
   if (snapshotErr) throw snapshotErr;
 
-  return { sent, opened, clicked };
+  return { sent, opened, clicked, capped };
 }
