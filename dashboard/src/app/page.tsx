@@ -20,7 +20,7 @@ import {
   getWoodpeckerSentiment,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
-import { SourceNav } from "@/components/SourceNav";
+import { ArrangementTabs } from "@/components/ArrangementTabs";
 import { StatusFilter } from "@/components/StatusFilter";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { CarrierEditor } from "@/components/CarrierEditor";
@@ -578,8 +578,8 @@ export default async function Home({
 }: PageProps<"/">) {
   const params = await searchParams;
   const rangeParam = typeof params.range === "string" ? params.range : "all";
-  const sourceParam =
-    typeof params.source === "string" ? params.source : "all";
+  const arrangementParam =
+    typeof params.arrangement === "string" ? params.arrangement : "overview";
   // Defaults to Published only — Sam's review flagged unpublished
   // automations as noise cluttering the list; "all" is still one click away.
   const keapStatusParam =
@@ -676,117 +676,105 @@ export default async function Home({
       ? allKeapAutomations
       : allKeapAutomations.filter((a) => a.status === keapStatusParam);
 
-  const showAll = sourceParam === "all";
-  const showWoodpecker = showAll || sourceParam === "woodpecker";
-  const showKeapAutomations = showAll || sourceParam === "keap_automations";
-  const showKeapBroadcasts = showAll || sourceParam === "keap_broadcasts";
-  const showChannelBlend = showAll || sourceParam === "channel_blend";
-  const showZendesk = showAll || sourceParam === "zendesk";
+  const showOverview = arrangementParam === "overview";
+  const showMarketing = arrangementParam === "marketing";
+  const showSupport = arrangementParam === "support";
 
   return (
     <div className="flex-1 bg-mist">
       <DashboardHeader active="client" />
 
-      <div className="mx-auto flex max-w-screen-2xl flex-col gap-8 px-6 py-10 sm:flex-row sm:px-10">
+      <div className="mx-auto max-w-screen-2xl px-6 py-10 sm:px-10">
         <Suspense fallback={null}>
-          <SourceNav />
+          <ArrangementTabs />
         </Suspense>
 
-        <main className="min-w-0 flex-1">
-          {showAll && (
-            <SectionBlock title="All Sources — Overview" accent="border-charcoal">
-              <AllSourcesDigestCard digest={allSourcesDigest} />
-              <div className="mb-4 flex justify-end">
-                <Suspense fallback={null}>
-                  <RangeSelect />
-                </Suspense>
+        <main className="min-w-0">
+          {showOverview && (
+            <>
+              <SectionBlock title="All Sources — Overview" accent="border-charcoal">
+                <AllSourcesDigestCard digest={allSourcesDigest} />
+                <div className="mb-4 flex justify-end">
+                  <Suspense fallback={null}>
+                    <RangeSelect />
+                  </Suspense>
+                </div>
+                <div className="mb-6">
+                  <VolumeTrendChart points={volumeTrend} />
+                </div>
+                <SourceSummaryTable rows={sourceSummary} />
+              </SectionBlock>
+
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                <SectionBlock title="By Carrier" accent="border-charcoal">
+                  <CarrierSummaryTable rows={carrierSummary} />
+                </SectionBlock>
+
+                <SectionBlock title="VIP Form Submissions" accent="border-charcoal">
+                  <VipSubmissionsWidget submissions={vipSubmissions} />
+                </SectionBlock>
               </div>
-              <div className="mb-6">
-                <VolumeTrendChart points={volumeTrend} />
-              </div>
-              <SourceSummaryTable rows={sourceSummary} />
-            </SectionBlock>
+            </>
           )}
 
-          {showAll && (
-            <SectionBlock title="By Carrier" accent="border-charcoal">
-              <CarrierSummaryTable rows={carrierSummary} />
-            </SectionBlock>
-          )}
-
-          {showAll && (
-            <SectionBlock title="VIP Form Submissions" accent="border-charcoal">
-              <VipSubmissionsWidget submissions={vipSubmissions} />
-            </SectionBlock>
-          )}
-
-          {showKeapAutomations && (
-            <SectionBlock title="Keap Automations" accent="border-amber-500">
-              <SectionTabs
-                accent="border-amber-500"
-                tabs={[
-                  {
-                    label: "Performance",
-                    content: (
-                      <div>
-                        {keapStatusOptions.length > 0 && (
-                          <div className="mb-4 flex justify-end">
-                            <Suspense fallback={null}>
-                              <StatusFilter
-                                paramName="keapStatus"
-                                options={keapStatusOptions}
-                                label="Status"
-                                defaultValue="PUBLISHED"
-                              />
-                            </Suspense>
+          {showMarketing && (
+            <>
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                <SectionBlock title="Keap Automations" accent="border-amber-500">
+                  <SectionTabs
+                    accent="border-amber-500"
+                    tabs={[
+                      {
+                        label: "Performance",
+                        content: (
+                          <div>
+                            {keapStatusOptions.length > 0 && (
+                              <div className="mb-4 flex justify-end">
+                                <Suspense fallback={null}>
+                                  <StatusFilter
+                                    paramName="keapStatus"
+                                    options={keapStatusOptions}
+                                    label="Status"
+                                    defaultValue="PUBLISHED"
+                                  />
+                                </Suspense>
+                              </div>
+                            )}
+                            <KeapAutomationsList automations={keapAutomations} />
                           </div>
-                        )}
-                        <KeapAutomationsList automations={keapAutomations} />
-                      </div>
-                    ),
-                  },
-                  {
-                    label: "Technical / Events",
-                    content: <KeapAutomationEventVolumeTable events={keapAutomationEvents} />,
-                  },
-                ]}
-              />
-            </SectionBlock>
-          )}
+                        ),
+                      },
+                      {
+                        label: "Technical / Events",
+                        content: <KeapAutomationEventVolumeTable events={keapAutomationEvents} />,
+                      },
+                    ]}
+                  />
+                </SectionBlock>
 
-          {showKeapBroadcasts && (
-            <SectionBlock title="Keap Broadcasts" accent="border-sky-500">
-              <KeapBroadcastsList broadcasts={keapBroadcasts} />
-            </SectionBlock>
-          )}
+                <SectionBlock title="Keap Broadcasts" accent="border-sky-500">
+                  <KeapBroadcastsList broadcasts={keapBroadcasts} />
+                </SectionBlock>
+              </div>
 
-          {showChannelBlend && (
-            <SectionBlock title="Channel Blend" accent="border-violet-500">
-              <ChannelBlendSection
-                summary={channelBlendSummary}
-                automationStats={channelBlendAutomationStats}
-                uploads={channelBlendUploads}
-                patterns={channelBlendPatterns}
-              />
-            </SectionBlock>
-          )}
+              <SectionBlock title="Channel Blend" accent="border-violet-500">
+                <ChannelBlendSection
+                  summary={channelBlendSummary}
+                  automationStats={channelBlendAutomationStats}
+                  uploads={channelBlendUploads}
+                  patterns={channelBlendPatterns}
+                />
+              </SectionBlock>
 
-          {showZendesk && (
-            <SectionBlock title="Zendesk" accent="border-teal-500">
-              <ZendeskSection summary={zendeskSummary} topicsSummary={zendeskTopicsSummary} />
-            </SectionBlock>
-          )}
-
-          {showWoodpecker && (
-            <SectionBlock
-              title={
-                rangeTotals
-                  ? `Woodpecker Campaigns (last ${rangeParam} days)`
-                  : "Woodpecker Campaigns"
-              }
-              accent="border-brand-green"
-            >
-              <SectionTabs
+              <SectionBlock
+                title={
+                  rangeTotals
+                    ? `Woodpecker Campaigns (last ${rangeParam} days)`
+                    : "Woodpecker Campaigns"
+                }
+                accent="border-brand-green"
+              >
+                <SectionTabs
                 accent="border-brand-green"
                 tabs={[
                   {
@@ -812,11 +800,9 @@ export default async function Home({
                               />
                             </Suspense>
                           )}
-                          {!showAll && (
-                            <Suspense fallback={null}>
-                              <RangeSelect />
-                            </Suspense>
-                          )}
+                          <Suspense fallback={null}>
+                            <RangeSelect />
+                          </Suspense>
                         </div>
                         {campaigns.length === 0 ? (
                           <p className="text-body-gray">
@@ -923,6 +909,13 @@ export default async function Home({
                   },
                 ]}
               />
+            </SectionBlock>
+            </>
+          )}
+
+          {showSupport && (
+            <SectionBlock title="Zendesk" accent="border-teal-500">
+              <ZendeskSection summary={zendeskSummary} topicsSummary={zendeskTopicsSummary} />
             </SectionBlock>
           )}
         </main>
