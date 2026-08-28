@@ -548,34 +548,33 @@ export async function generateAllSourcesDigest(range: ZendeskDateRange): Promise
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 2048,
+    max_tokens: 600,
     system:
       "You write a leadership-facing executive digest for a company that " +
       "runs cold-email lead generation (Woodpecker, Keap) and has a " +
-      "Zendesk customer support team. Ground every statement strictly in " +
-      "the numbers and summaries provided — never invent figures, and if " +
-      "data for one side is thin, say so plainly rather than padding.\n\n" +
-      "Output format matters — the reader's UI parses it into a scannable " +
-      "layout, so follow this exactly:\n" +
+      "Zendesk customer support team. This must be genuinely skimmable in " +
+      "under 15 seconds — a busy leader reads it once, not a report. " +
+      "Ground every statement strictly in the numbers and summaries " +
+      "provided — never invent figures.\n\n" +
+      "Output format — the reader's UI parses this, so follow it exactly:\n" +
       "Line 1: \"PERIOD: <start date> to <end date>\" using the period " +
       "dates given in the data. Nothing else on that line.\n" +
-      "Then exactly three sections, each starting with a line of just " +
-      "\"## <Section Title>\" (that literal ## marker, nothing else on the " +
-      "line) followed by one short paragraph, plain language, no further " +
-      "markdown/bold/bullets inside the paragraph:\n" +
-      "## Marketing Performance — sent/open/click highlights across " +
-      "Woodpecker and Keap, calling out anything notably strong or weak. " +
-      "Note that Keap figures are account-wide latest totals, not strictly " +
-      "scoped to the period, if you use them.\n" +
-      "## Support Health — ticket volume, CSAT, response/resolution time, " +
-      "and which agent or group is carrying the most load.\n" +
-      "## Cross-Referenced Insight — explicitly look for a genuine " +
-      "connection between the marketing and support data (e.g. rising " +
-      "lead volume alongside more lead-quality complaints, or a support " +
-      "topic that suggests a marketing/messaging problem). Only state a " +
-      "connection if the data actually supports it — if marketing and " +
-      "support look unrelated this period, say that plainly instead of " +
-      "forcing a narrative.",
+      "Then exactly 4 lines, each starting with \"- \" and each ONE " +
+      "sentence (25 words max) — pick the single most important fact per " +
+      "line, not a list of stats:\n" +
+      "- Marketing: the single most important sent/open/click fact this " +
+      "period across Woodpecker and Keap.\n" +
+      "- Support: the single most important ticket volume/CSAT/response-" +
+      "time fact this period.\n" +
+      "- Watch: the one thing that most needs attention (a risk, an " +
+      "anomaly, a broken metric, a copy defect) — this is the line " +
+      "leadership should actually act on.\n" +
+      "- Connection: one sentence on a genuine link between the marketing " +
+      "and support data — if there truly isn't one this period, say " +
+      "\"No clear connection this period\" instead of forcing one.\n\n" +
+      "No extra bullets, no sub-bullets, no paragraphs, nothing after the " +
+      "4 lines. If a whole category has no usable data, say that in its " +
+      "one line rather than omitting the line or padding it.",
     messages: [
       {
         role: "user",

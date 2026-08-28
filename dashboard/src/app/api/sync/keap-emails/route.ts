@@ -4,8 +4,10 @@ import { errorMessage } from "@/lib/error-message";
 
 // Isolated from the other sources — this one paginates up to 300 pages
 // (300k emails) sequentially and was the main contributor to the combined
-// /api/sync route blowing its timeout.
-export const maxDuration = 120;
+// /api/sync route blowing its timeout. Even isolated with 120s it still
+// hit FUNCTION_INVOCATION_TIMEOUT, so asking for the platform max; Vercel
+// silently caps this to whatever the plan actually allows.
+export const maxDuration = 300;
 
 export async function POST() {
   try {

@@ -4,17 +4,23 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AllSourcesDigest } from "@/lib/data";
 
-type DigestSection = { title: string; body: string };
+type DigestBullet = { label: string | null; text: string };
 
-// The prompt asks Claude for "PERIOD: ..." as line 1 and "## Section Title"
-// markers before each paragraph, so this renders as real headings instead
-// of one flat wall of text. Falls back to plain text for older digests
-// generated before this format existed.
-function parseDigest(text: string): { period: string | null; sections: DigestSection[] } {
+const BULLET_ACCENT: Record<string, string> = {
+  Watch: "bg-status-warning",
+  Support: "bg-teal-500",
+  Marketing: "bg-brand-green",
+  Connection: "bg-violet-500",
+};
+
+// The prompt asks Claude for "PERIOD: ..." as line 1, then exactly 4 "- "
+// bullets (Marketing/Support/Watch/Connection), one sentence each — parsed
+// here into a scannable list instead of a wall of paragraphs. Falls back to
+// plain text for older digests generated before this format existed.
+function parseDigest(text: string): { period: string | null; bullets: DigestBullet[] } {
   const lines = text.split("\n");
   let period: string | null = null;
-  const sections: DigestSection[] = [];
-  let current: DigestSection | null = null;
+  const bullets: DigestBullet[] = [];
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
@@ -22,18 +28,18 @@ function parseDigest(text: string): { period: string | null; sections: DigestSec
       period = line.replace(/^PERIOD:\s*/, "");
       continue;
     }
-    if (line.startsWith("## ")) {
-      current = { title: line.slice(3).trim(), body: "" };
-      sections.push(current);
-      continue;
-    }
-    if (!line) continue;
-    if (current) {
-      current.body = current.body ? `${current.body} ${line}` : line;
+    if (line.startsWith("- ")) {
+      const rest = line.slice(2).trim();
+      const match = rest.match(/^([A-Za-z ]{2,20}):\s*(.*)$/);
+      if (match) {
+        bullets.push({ label: match[1], text: match[2] });
+      } else {
+        bullets.push({ label: null, text: rest });
+      }
     }
   }
 
-  return { period, sections };
+  return { period, bullets };
 }
 
 export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
@@ -122,9 +128,9 @@ export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
       {digest ? (
         <>
           {(() => {
-            const { period, sections } = parseDigest(digest.summary);
-            if (sections.length === 0) {
-              // Older digest generated before the "## Section" format existed.
+            const { period: coveredPeriod, bullets } = parseDigest(digest.summary);
+            if (bullets.length === 0) {
+              // Older digest generated before the bullet format existed.
               return (
                 <p className="whitespace-pre-line text-sm leading-relaxed text-charcoal">
                   {digest.summary}
@@ -133,18 +139,23 @@ export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
             }
             return (
               <div>
-                {period && (
+                {coveredPeriod && (
                   <span className="mb-4 inline-block rounded-full bg-charcoal/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-body-gray">
-                    {period}
+                    {coveredPeriod}
                   </span>
                 )}
-                <div className="flex flex-col gap-5">
-                  {sections.map((s) => (
-                    <div key={s.title}>
-                      <h4 className="mb-1.5 font-heading text-sm font-bold uppercase tracking-wide text-charcoal">
-                        {s.title}
-                      </h4>
-                      <p className="text-sm leading-relaxed text-charcoal">{s.body}</p>
+                <div className="flex flex-col gap-3">
+                  {bullets.map((b, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <span
+                        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                          (b.label && BULLET_ACCENT[b.label]) || "bg-charcoal/20"
+                        }`}
+                      />
+                      <p className="text-sm leading-relaxed text-charcoal">
+                        {b.label && <span className="font-semibold">{b.label}: </span>}
+                        {b.text}
+                      </p>
                     </div>
                   ))}
                 </div>

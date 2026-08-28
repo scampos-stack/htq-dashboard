@@ -844,9 +844,10 @@ export default async function Home({
                         </div>
 
                         <div className="flex flex-wrap gap-x-8 gap-y-4">
-                          <Metric label="Sent" value={sent.toLocaleString()} />
-                          <Metric label="Open rate" value={openRate} />
+                          <Metric size="sm" label="Sent" value={sent.toLocaleString()} />
+                          <Metric size="sm" label="Open rate" value={openRate} />
                           <Metric
+                            size="sm"
                             label="Clicked"
                             value={
                               rangeStats
@@ -855,10 +856,12 @@ export default async function Home({
                             }
                           />
                           <Metric
+                            size="sm"
                             label="Delivered"
                             value={delivered.toLocaleString()}
                           />
                           <Metric
+                            size="sm"
                             label="Bounce rate"
                             value={
                               rangeStats
@@ -869,7 +872,7 @@ export default async function Home({
                             }
                           />
                           {rangeStats ? (
-                            <Metric label="Responded" value="—" />
+                            <Metric size="sm" label="Responded" value="—" />
                           ) : (
                             <div className="flex flex-col">
                               <span className="flex items-center gap-2 text-sm font-bold text-charcoal font-heading">
