@@ -946,3 +946,20 @@ export async function getZendeskTopicsSummary(): Promise<ZendeskTopicsSummary> {
   if (!data) return null;
   return { summary: data.summary, generatedAt: data.generated_at };
 }
+
+export type AllSourcesDigest = {
+  summary: string;
+  generatedAt: string;
+} | null;
+
+export async function getAllSourcesDigest(): Promise<AllSourcesDigest> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("ai_summaries")
+    .select("summary, generated_at")
+    .eq("scope", "all_sources_digest")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { summary: data.summary, generatedAt: data.generated_at };
+}

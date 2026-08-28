@@ -2,6 +2,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { supabaseServer } from "./supabase-server";
 import { stripHtml } from "./strip-html";
 import { slugifyCategory } from "./slugify-category";
+import {
+  getDailyRangeTotals,
+  getSourceSummary,
+  getZendeskSummary,
+  getWoodpeckerAiSummary,
+  getZendeskTopicsSummary,
+  type ZendeskDateRange,
+} from "./data";
 
 type CampaignDigest = {
   name: string;
@@ -424,6 +432,175 @@ export async function generateZendeskTopicsSummary(): Promise<{
   const { error } = await supabase.from("ai_summaries").upsert(
     {
       scope: "zendesk_topics",
+      summary,
+      generated_at: new Date().toISOString(),
+    },
+    { onConflict: "scope" }
+  );
+  if (error) throw error;
+
+  return { generated: true };
+}
+
+// Marketing (Woodpecker/Keap) and support (Zendesk) live in separate
+// systems with no shared join key — this pulls a snapshot of both for the
+// same period and asks Claude to write one leadership-facing narrative
+// that explicitly looks for correlation between them (e.g. lead volume up
+// alongside more lead-quality complaints), not just two summaries stapled
+// together.
+async function getAllSourcesDigestData(range: ZendeskDateRange) {
+  const supabase = supabaseServer();
+
+  // Woodpecker: campaign_stats_daily holds true daily deltas, so this is
+  // genuinely range-accurate (unlike campaign_stats_snapshot, which is a
+  // cumulative point-in-time capture — summing those across days would
+  // massively over-count).
+  const days = Math.max(
+    1,
+    Math.round((Date.now() - range.since.getTime()) / (24 * 60 * 60 * 1000))
+  );
+  const rangeTotals = await getDailyRangeTotals(days);
+  const { data: wpCampaigns, error: wpErr } = await supabase
+    .from("campaigns")
+    .select("id, exclude_from_metrics")
+    .eq("source", "woodpecker");
+  if (wpErr) throw wpErr;
+
+  const woodpecker = { sent: 0, delivered: 0, opened: 0 };
+  for (const c of wpCampaigns ?? []) {
+    if (c.exclude_from_metrics) continue;
+    const r = rangeTotals.get(c.id);
+    if (r) {
+      woodpecker.sent += r.sent;
+      woodpecker.delivered += r.delivered;
+      woodpecker.opened += r.opened;
+    }
+  }
+
+  // Keap: only a latest-cumulative snapshot exists (no daily-delta table
+  // for Keap yet), so these are account-wide totals as of the last sync,
+  // not strictly scoped to the period — the prompt is told this explicitly
+  // so it doesn't imply false precision.
+  const sourceSummary = await getSourceSummary();
+  const keapEmails = sourceSummary.find((r) => r.key === "keap_emails");
+  const keapAutomationEmails = sourceSummary.find(
+    (r) => r.key === "keap_automation_emails"
+  );
+  const keapBroadcasts = sourceSummary.find((r) => r.key === "keap_broadcasts");
+
+  const zendesk = await getZendeskSummary(range);
+  const woodpeckerAi = await getWoodpeckerAiSummary();
+  const zendeskTopics = await getZendeskTopicsSummary();
+
+  return {
+    period: {
+      since: range.since.toISOString().slice(0, 10),
+      until: (range.until ?? new Date()).toISOString().slice(0, 10),
+    },
+    marketing: {
+      woodpecker,
+      keapMarketingEmails: keapEmails
+        ? { sent: keapEmails.sent, opened: keapEmails.opened, clicked: keapEmails.clicked }
+        : null,
+      keapAutomationEmails: keapAutomationEmails
+        ? { sent: keapAutomationEmails.sent }
+        : null,
+      keapBroadcasts: keapBroadcasts
+        ? { sent: keapBroadcasts.sent, opened: keapBroadcasts.opened, clicked: keapBroadcasts.clicked }
+        : null,
+    },
+    support: {
+      totalTickets: zendesk.totalRows,
+      byStatus: zendesk.byStatus,
+      csat: zendesk.csat,
+      avgReplyMinutes: zendesk.avgReplyMinutes,
+      avgResolutionMinutes: zendesk.avgResolutionMinutes,
+      topAgents: zendesk.byAgent.slice(0, 5),
+      topGroups: zendesk.byGroup.slice(0, 5),
+      topTags: zendesk.topTags.slice(0, 5),
+    },
+    existingSummaries: {
+      woodpeckerExecutiveSummary: woodpeckerAi?.summary ?? null,
+      zendeskTopTopics: zendeskTopics?.summary ?? null,
+    },
+  };
+}
+
+export async function generateAllSourcesDigest(range: ZendeskDateRange): Promise<{
+  generated: boolean;
+  reason?: string;
+}> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { generated: false, reason: "ANTHROPIC_API_KEY not configured" };
+  }
+
+  const digestData = await getAllSourcesDigestData(range);
+  if (
+    digestData.marketing.woodpecker.sent === 0 &&
+    !digestData.marketing.keapMarketingEmails &&
+    digestData.support.totalTickets === 0
+  ) {
+    return { generated: false, reason: "No marketing or support data for this period yet" };
+  }
+
+  const client = new Anthropic({ apiKey });
+
+  const response = await client.messages.create({
+    model: "claude-opus-5",
+    max_tokens: 2048,
+    system:
+      "You write a leadership-facing executive digest for a company that " +
+      "runs cold-email lead generation (Woodpecker, Keap) and has a " +
+      "Zendesk customer support team. Ground every statement strictly in " +
+      "the numbers and summaries provided — never invent figures, and if " +
+      "data for one side is thin, say so plainly rather than padding.\n\n" +
+      "Start with one line stating the period covered (use the period " +
+      "dates given in the data). Then write three short parts in plain " +
+      "language, no markdown headers or bold:\n" +
+      "1. Marketing performance — sent/open/click highlights across " +
+      "Woodpecker and Keap, calling out anything notably strong or weak. " +
+      "Note that Keap figures are account-wide latest totals, not strictly " +
+      "scoped to the period, if you use them.\n" +
+      "2. Support health — ticket volume, CSAT, response/resolution time, " +
+      "and which agent or group is carrying the most load.\n" +
+      "3. Cross-referenced insight — explicitly look for a genuine " +
+      "connection between the marketing and support data (e.g. rising " +
+      "lead volume alongside more lead-quality complaints, or a support " +
+      "topic that suggests a marketing/messaging problem). Only state a " +
+      "connection if the data actually supports it — if marketing and " +
+      "support look unrelated this period, say that plainly instead of " +
+      "forcing a narrative.",
+    messages: [
+      {
+        role: "user",
+        content:
+          "Here is this period's marketing and support data, plus the " +
+          "existing AI-generated summaries for additional context (JSON). " +
+          "Write the executive digest:\n\n" + JSON.stringify(digestData, null, 2),
+      },
+    ],
+  });
+
+  const textBlock = response.content.find(
+    (b): b is Anthropic.TextBlock => b.type === "text"
+  );
+  const summary = textBlock?.text?.trim();
+  if (!summary) {
+    console.error(
+      "[all-sources digest] no text content, stop_reason:",
+      response.stop_reason
+    );
+    return {
+      generated: false,
+      reason: `Claude returned no text content (stop_reason: ${response.stop_reason})`,
+    };
+  }
+
+  const supabase = supabaseServer();
+  const { error } = await supabase.from("ai_summaries").upsert(
+    {
+      scope: "all_sources_digest",
       summary,
       generated_at: new Date().toISOString(),
     },

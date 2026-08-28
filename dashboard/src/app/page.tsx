@@ -13,6 +13,7 @@ import {
   getChannelBlendCategoryPatterns,
   getZendeskSummary,
   getZendeskTopicsSummary,
+  getAllSourcesDigest,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
@@ -32,6 +33,7 @@ import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { CampaignEmailContent } from "@/components/CampaignEmailContent";
 import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
 import { ZendeskSection } from "@/components/ZendeskSection";
+import { AllSourcesDigestCard } from "@/components/AllSourcesDigestCard";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { BroadcastCard } from "@/components/BroadcastCard";
@@ -621,6 +623,7 @@ export default async function Home({
     channelBlendPatterns,
     zendeskSummary,
     zendeskTopicsSummary,
+    allSourcesDigest,
     keapAutomationEvents,
     woodpeckerAiSummary,
     woodpeckerSentiment,
@@ -638,6 +641,7 @@ export default async function Home({
     getChannelBlendCategoryPatterns(),
     getZendeskSummary(zendeskRange),
     getZendeskTopicsSummary(),
+    getAllSourcesDigest(),
     getKeapAutomationEventVolume(eventsRange),
     getWoodpeckerAiSummary(),
     getWoodpeckerSentiment(),
@@ -675,6 +679,7 @@ export default async function Home({
         <main className="min-w-0 flex-1">
           {showAll && (
             <SectionBlock title="All Sources — Overview" accent="border-charcoal">
+              <AllSourcesDigestCard digest={allSourcesDigest} />
               <div className="mb-4 flex justify-end">
                 <Suspense fallback={null}>
                   <RangeSelect />
