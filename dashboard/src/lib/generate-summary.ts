@@ -209,7 +209,7 @@ async function generateChannelBlendCategoryPatterns(
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 1024,
+    max_tokens: 2048,
     system:
       `You analyze call disposition notes from the "${category}" category ` +
       "of a lead-generation outreach team's Channel Blend spreadsheet. Each " +
@@ -365,7 +365,7 @@ export async function generateZendeskTopicsSummary(): Promise<{
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 1536,
+    max_tokens: 4096,
     system:
       "You analyze support ticket subjects/descriptions from a " +
       "lead-generation company's Zendesk. Different tickets describe the " +
