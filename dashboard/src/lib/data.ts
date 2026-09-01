@@ -744,6 +744,86 @@ export async function getKeapAutomations(): Promise<KeapAutomation[]> {
   });
 }
 
+export type DormantKeapAutomation = {
+  name: string;
+  daysTracked: number;
+};
+
+// An automation with 0 active contacts on every day we've snapshotted (not
+// just currently 0) — surfaced separately from the main list so a
+// long-dead automation doesn't sit mixed in with ones that just emptied
+// out this week and may refill. Requires a minimum tracked-days count so a
+// brand-new automation with only a day or two of history isn't mistaken
+// for dormant.
+const DORMANT_MIN_TRACKED_DAYS = 7;
+
+export async function getDormantKeapAutomations(): Promise<DormantKeapAutomation[]> {
+  const supabase = supabaseServer();
+
+  const { data: campaigns, error: campaignsErr } = await supabase
+    .from("campaigns")
+    .select("id, name")
+    .eq("source", "keap")
+    .neq("category", "email_aggregate");
+  if (campaignsErr) throw campaignsErr;
+  if (!campaigns?.length) return [];
+
+  const { data: snapshots, error: snapshotsErr } = await supabase
+    .from("campaign_stats_snapshot")
+    .select("campaign_id, active_contacts, pulled_at")
+    .in(
+      "campaign_id",
+      campaigns.map((c) => c.id)
+    );
+  if (snapshotsErr) throw snapshotsErr;
+
+  // A fast-cycling automation (contacts enter and complete before the next
+  // daily snapshot) can show 0 active contacts every single day while
+  // still being genuinely alive — the webhook-tracked sent events are the
+  // only signal that catches that, since they log the moment an email
+  // actually goes out rather than a once-a-day active-contact count.
+  // Cross-referencing against them keeps a fast automation like that off
+  // this list. Same contains-match the webhook route itself uses to tie an
+  // event's automation_name back to a real campaign.
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+  const { data: recentEvents, error: eventsErr } = await supabase
+    .from("keap_automation_events")
+    .select("automation_name, event_type")
+    .gte("occurred_at", since.toISOString())
+    .ilike("event_type", "%sent%");
+  if (eventsErr) throw eventsErr;
+
+  const recentlyActiveCampaignIds = new Set<number>();
+  for (const event of recentEvents ?? []) {
+    if (!event.automation_name) continue;
+    for (const c of campaigns) {
+      if (c.name.toLowerCase().includes(event.automation_name.toLowerCase())) {
+        recentlyActiveCampaignIds.add(c.id);
+      }
+    }
+  }
+
+  const byCampaign = new Map<number, { days: Set<string>; everActive: boolean }>();
+  for (const row of snapshots ?? []) {
+    const entry = byCampaign.get(row.campaign_id) ?? { days: new Set<string>(), everActive: false };
+    entry.days.add(row.pulled_at);
+    if ((row.active_contacts ?? 0) > 0) entry.everActive = true;
+    byCampaign.set(row.campaign_id, entry);
+  }
+
+  const nameById = new Map(campaigns.map((c) => [c.id, c.name]));
+  const dormant: DormantKeapAutomation[] = [];
+  for (const [campaignId, entry] of byCampaign) {
+    if (entry.everActive) continue;
+    if (recentlyActiveCampaignIds.has(campaignId)) continue;
+    if (entry.days.size < DORMANT_MIN_TRACKED_DAYS) continue;
+    dormant.push({ name: nameById.get(campaignId) ?? "Unknown", daysTracked: entry.days.size });
+  }
+
+  return dormant.sort((a, b) => b.daysTracked - a.daysTracked);
+}
+
 export async function getCampaignsWithStats(): Promise<CampaignWithStats[]> {
   const supabase = supabaseServer();
 

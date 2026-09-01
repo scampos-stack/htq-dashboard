@@ -4,6 +4,7 @@ import {
   getDailyRangeTotals,
   getSourceSummary,
   getKeapAutomations,
+  getDormantKeapAutomations,
   getCarrierSummary,
   getKeapBroadcasts,
   getVipSubmissions,
@@ -634,6 +635,7 @@ export default async function Home({
     sourceSummary,
     carrierSummary,
     allKeapAutomations,
+    dormantKeapAutomations,
     keapBroadcasts,
     vipSubmissions,
     channelBlendSummary,
@@ -653,6 +655,7 @@ export default async function Home({
     getSourceSummary(),
     getCarrierSummary(),
     getKeapAutomations(),
+    getDormantKeapAutomations(),
     getKeapBroadcasts(),
     getVipSubmissions(),
     getChannelBlendSummary(),
@@ -787,6 +790,26 @@ export default async function Home({
                             </div>
                           )}
                           <KeapAutomationsList automations={keapAutomations} />
+                          {dormantKeapAutomations.length > 0 && (
+                            <div className="mt-4 rounded-3xl bg-white p-4 shadow-sm">
+                              <Collapsible
+                                label={`${dormantKeapAutomations.length} dormant automation${
+                                  dormantKeapAutomations.length === 1 ? "" : "s"
+                                } (0 active contacts the whole time we've tracked)`}
+                              >
+                                <ul className="flex flex-col gap-1.5 text-sm">
+                                  {dormantKeapAutomations.map((a) => (
+                                    <li key={a.name} className="flex items-center justify-between gap-3">
+                                      <span className="text-charcoal">{a.name}</span>
+                                      <span className="whitespace-nowrap text-xs text-body-gray">
+                                        0 for {a.daysTracked}d tracked
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </Collapsible>
+                            </div>
+                          )}
                         </div>
                       ),
                     },

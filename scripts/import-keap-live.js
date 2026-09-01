@@ -74,9 +74,12 @@ async function main() {
     completed_contacts: c.completed_contact_count ?? 0,
   }));
 
+  // Targets the partial unique index on (campaign_id, pulled_at) scoped to
+  // step/version IS NULL — see migrations/016 — not the table-wide
+  // constraint, which never matches since Postgres treats NULL <> NULL.
   const { error: snapshotErr } = await supabase
     .from('campaign_stats_snapshot')
-    .upsert(snapshotPayload, { onConflict: 'campaign_id,step,version,pulled_at' });
+    .upsert(snapshotPayload, { onConflict: 'campaign_id,pulled_at' });
   if (snapshotErr) throw snapshotErr;
 
   console.log(`Upserted ${campaignsPayload.length} campaigns and ${snapshotPayload.length} snapshot rows.`);
