@@ -777,9 +777,10 @@ export default async function Home({
                             <div className="mb-4">
                               <VerticalBarChart
                                 title="Active Contacts by Automation"
-                                description="By active contacts currently in the automation."
+                                description="By active contacts currently in the automation. Automations with none active aren't shown."
                                 accent="bg-amber-500"
-                                rows={[...keapAutomations]
+                                rows={keapAutomations
+                                  .filter((a) => a.activeContacts > 0)
                                   .sort((a, b) => b.activeContacts - a.activeContacts)
                                   .map((a) => ({ label: a.name, count: a.activeContacts }))}
                               />
