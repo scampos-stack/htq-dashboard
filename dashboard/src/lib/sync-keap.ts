@@ -1,5 +1,6 @@
 import { supabaseServer } from "./supabase-server";
 import { classifyCarrier } from "./classify-carrier";
+import { upsertDailySnapshot } from "./upsert-daily-snapshot";
 
 const API_BASE = "https://api.infusionsoft.com/crm/rest/v1";
 
@@ -74,18 +75,24 @@ export async function syncKeap(): Promise<{
 
   const idByExternalId = new Map((upserted ?? []).map((c) => [c.external_id, c.id]));
 
-  const snapshotPayload = campaigns.map((c) => ({
-    campaign_id: idByExternalId.get(String(c.id)),
-    step: null,
-    version: null,
-    active_contacts: c.active_contact_count ?? 0,
-    completed_contacts: c.completed_contact_count ?? 0,
-  }));
+  const snapshotPayload = campaigns
+    .map((c) => ({
+      campaignId: idByExternalId.get(String(c.id)),
+      active_contacts: c.active_contact_count ?? 0,
+      completed_contacts: c.completed_contact_count ?? 0,
+    }))
+    .filter((s): s is typeof s & { campaignId: number } => s.campaignId != null);
 
-  const { error: snapshotErr } = await supabase
-    .from("campaign_stats_snapshot")
-    .upsert(snapshotPayload, { onConflict: "campaign_id,step,version,pulled_at" });
-  if (snapshotErr) throw snapshotErr;
+  // See upsert-daily-snapshot.ts — ON CONFLICT can't be inferred against
+  // the partial unique index these null-step/version rows rely on.
+  await Promise.all(
+    snapshotPayload.map((s) =>
+      upsertDailySnapshot(supabase, s.campaignId, {
+        active_contacts: s.active_contacts,
+        completed_contacts: s.completed_contacts,
+      })
+    )
+  );
 
   return { campaigns: campaignsPayload.length, snapshots: snapshotPayload.length };
 }
@@ -152,22 +159,15 @@ export async function syncKeapEmailAggregate(
     .single();
   if (campaignErr) throw campaignErr;
 
-  const { error: snapshotErr } = await supabase
-    .from("campaign_stats_snapshot")
-    .upsert(
-      {
-        campaign_id: campaign.id,
-        step: null,
-        version: null,
-        sent,
-        delivered: sent,
-        opened,
-        opened_rate: sent ? Number(((opened / sent) * 100).toFixed(1)) : null,
-        clicked,
-      },
-      { onConflict: "campaign_id,step,version,pulled_at" }
-    );
-  if (snapshotErr) throw snapshotErr;
+  // See upsert-daily-snapshot.ts — ON CONFLICT can't be inferred against
+  // the partial unique index this null-step/version row relies on.
+  await upsertDailySnapshot(supabase, campaign.id, {
+    sent,
+    delivered: sent,
+    opened,
+    opened_rate: sent ? Number(((opened / sent) * 100).toFixed(1)) : null,
+    clicked,
+  });
 
   return { sent, opened, clicked, capped };
 }

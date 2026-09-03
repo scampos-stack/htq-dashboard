@@ -1,6 +1,7 @@
 import { supabaseServer } from "./supabase-server";
 import { classifyCarrier } from "./classify-carrier";
 import { errorMessage } from "./error-message";
+import { upsertDailySnapshot } from "./upsert-daily-snapshot";
 
 const API_BASE = "https://api.woodpecker.co/rest/v1";
 
@@ -211,10 +212,16 @@ export async function syncWoodpecker(): Promise<{
     }
   }
 
-  const { error: snapshotErr } = await supabase
-    .from("campaign_stats_snapshot")
-    .upsert(snapshotPayload, { onConflict: "campaign_id,step,version,pulled_at" });
-  if (snapshotErr) throw snapshotErr;
+  // step/version are always null on this whole-campaign snapshot — see
+  // upsert-daily-snapshot.ts: ON CONFLICT can't be inferred against the
+  // partial unique index these rows rely on, so read-then-write instead.
+  await Promise.all(
+    snapshotPayload
+      .filter((s): s is typeof s & { campaign_id: number } => s.campaign_id != null)
+      .map(({ campaign_id, step: _step, version: _version, ...fields }) =>
+        upsertDailySnapshot(supabase, campaign_id, fields)
+      )
+  );
 
   let stepSnapshotCount = 0;
   let stepStatsError: string | undefined;
