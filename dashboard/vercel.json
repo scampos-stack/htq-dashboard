@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/sync-main", "schedule": "0 21 * * *" },
+    { "path": "/api/cron/sync-keap-emails", "schedule": "0 21 * * *" }
+  ]
+}
