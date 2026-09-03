@@ -5,6 +5,7 @@ import { DonutChart } from "@/components/DonutChart";
 import { ZendeskTopicsCard } from "@/components/ZendeskTopicsCard";
 import { ZendeskGroupedStatTable } from "@/components/ZendeskGroupedStatTable";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
+import { StatusFilter } from "@/components/StatusFilter";
 import { SectionTabs } from "@/components/SectionTabs";
 import { Metric } from "@/components/Metric";
 import { formatDuration } from "@/lib/format-duration";
@@ -12,12 +13,22 @@ import { formatDuration } from "@/lib/format-duration";
 export function ZendeskSection({
   summary,
   topicsSummary,
+  groupOptions,
+  assigneeOptions,
 }: {
   summary: ZendeskSummary;
   topicsSummary: ZendeskTopicsSummary;
+  groupOptions: string[];
+  assigneeOptions: string[];
 }) {
-  const rangeSelect = (
-    <div className="mb-4 flex justify-end">
+  const filterBar = (
+    <div className="mb-4 flex flex-wrap justify-end gap-3">
+      <Suspense fallback={null}>
+        <StatusFilter paramName="zendeskGroup" options={groupOptions} label="Group" />
+      </Suspense>
+      <Suspense fallback={null}>
+        <StatusFilter paramName="zendeskAssignee" options={assigneeOptions} label="Assignee" />
+      </Suspense>
       <Suspense fallback={null}>
         <ZendeskRangeSelect />
       </Suspense>
@@ -27,10 +38,10 @@ export function ZendeskSection({
   if (summary.totalRows === 0) {
     return (
       <div>
-        {rangeSelect}
+        {filterBar}
         <p className="text-body-gray">
-          No Zendesk tickets in this range — try widening it, or click
-          &quot;Sync Now&quot; if nothing has synced yet.
+          No Zendesk tickets match this range/filter — try widening it, or
+          click &quot;Sync Now&quot; if nothing has synced yet.
         </p>
       </div>
     );
@@ -128,7 +139,7 @@ export function ZendeskSection({
 
   return (
     <div>
-      {rangeSelect}
+      {filterBar}
       <SectionTabs
         accent="border-teal-500"
         tabs={[

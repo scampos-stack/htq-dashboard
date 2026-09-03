@@ -950,7 +950,31 @@ function average(values: number[]): number | null {
 
 export type ZendeskDateRange = { since: Date; until?: Date };
 
-export async function getZendeskSummary(range?: ZendeskDateRange): Promise<ZendeskSummary> {
+// Distinct group/assignee names for the filter dropdowns — deliberately
+// unscoped by range or by the other filter's current selection, so
+// switching groups doesn't collapse the assignee dropdown's own options.
+export async function getZendeskFilterOptions(): Promise<{ groups: string[]; assignees: string[] }> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase.from("zendesk_tickets").select("group_name, assignee_name");
+  if (error) throw error;
+
+  const groups = new Set<string>();
+  const assignees = new Set<string>();
+  for (const r of data ?? []) {
+    groups.add(r.group_name || "Ungrouped");
+    assignees.add(r.assignee_name || "Unassigned");
+  }
+  return {
+    groups: [...groups].sort(),
+    assignees: [...assignees].sort(),
+  };
+}
+
+export async function getZendeskSummary(
+  range?: ZendeskDateRange,
+  groupName?: string,
+  assigneeName?: string
+): Promise<ZendeskSummary> {
   const supabase = supabaseServer();
 
   let query = supabase
@@ -962,6 +986,18 @@ export async function getZendeskSummary(range?: ZendeskDateRange): Promise<Zende
   if (range) {
     query = query.gte("created_at", range.since.toISOString());
     if (range.until) query = query.lte("created_at", range.until.toISOString());
+  }
+  // "Ungrouped"/"Unassigned" are the byGroup/byAgent fallback labels for a
+  // null column — matched with .is(), not .eq(), since a real group/agent
+  // name never equals null.
+  if (groupName) {
+    query = groupName === "Ungrouped" ? query.is("group_name", null) : query.eq("group_name", groupName);
+  }
+  if (assigneeName) {
+    query =
+      assigneeName === "Unassigned"
+        ? query.is("assignee_name", null)
+        : query.eq("assignee_name", assigneeName);
   }
   const { data, error } = await query;
   if (error) throw error;

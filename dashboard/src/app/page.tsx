@@ -13,6 +13,7 @@ import {
   getChannelBlendUploads,
   getChannelBlendCategoryPatterns,
   getZendeskSummary,
+  getZendeskFilterOptions,
   getZendeskTopicsSummary,
   getAllSourcesDigest,
   getDailyVolumeTrend,
@@ -630,6 +631,11 @@ export default async function Home({
           return { since };
         })();
 
+  const zendeskGroupParam =
+    typeof params.zendeskGroup === "string" ? params.zendeskGroup : "all";
+  const zendeskAssigneeParam =
+    typeof params.zendeskAssignee === "string" ? params.zendeskAssignee : "all";
+
   const [
     allCampaigns,
     sourceSummary,
@@ -643,6 +649,7 @@ export default async function Home({
     channelBlendUploads,
     channelBlendPatterns,
     zendeskSummary,
+    zendeskFilterOptions,
     zendeskTopicsSummary,
     allSourcesDigest,
     keapAutomationEvents,
@@ -662,7 +669,12 @@ export default async function Home({
     getChannelBlendAutomationStats(),
     getChannelBlendUploads(),
     getChannelBlendCategoryPatterns(),
-    getZendeskSummary(zendeskRange),
+    getZendeskSummary(
+      zendeskRange,
+      zendeskGroupParam === "all" ? undefined : zendeskGroupParam,
+      zendeskAssigneeParam === "all" ? undefined : zendeskAssigneeParam
+    ),
+    getZendeskFilterOptions(),
     getZendeskTopicsSummary(),
     getAllSourcesDigest(),
     getKeapAutomationEventVolume(eventsRange),
@@ -988,7 +1000,12 @@ export default async function Home({
 
           {showSupport && (
             <SectionBlock title="Zendesk" accent="border-teal-500">
-              <ZendeskSection summary={zendeskSummary} topicsSummary={zendeskTopicsSummary} />
+              <ZendeskSection
+                summary={zendeskSummary}
+                topicsSummary={zendeskTopicsSummary}
+                groupOptions={zendeskFilterOptions.groups}
+                assigneeOptions={zendeskFilterOptions.assignees}
+              />
             </SectionBlock>
           )}
         </main>
