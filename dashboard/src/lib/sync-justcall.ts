@@ -147,7 +147,11 @@ export async function syncJustCall(): Promise<{ calls: number; cappedByRateLimit
   // cursor to now. If capped mid-backlog instead, advance only to the
   // latest call actually processed so next run continues rather than
   // skipping whatever's still unprocessed between there and now.
-  await setCursor(cappedByRateLimit && latestCallAt ? latestCallAt : toJustCallDatetime(new Date()));
+  await setCursor(
+    cappedByRateLimit && latestCallAt
+      ? toJustCallDatetime(new Date(latestCallAt))
+      : toJustCallDatetime(new Date())
+  );
 
   return { calls: total, cappedByRateLimit };
 }
