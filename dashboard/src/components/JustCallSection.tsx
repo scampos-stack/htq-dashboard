@@ -9,8 +9,16 @@ import { JustCallRangeSelect } from "@/components/JustCallRangeSelect";
 function formatCallDuration(seconds: number | null): string {
   if (seconds == null) return "—";
   const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
+  const secs = Math.round(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+// Average duration is a computed mean (not a whole-second count like an
+// individual call), so it renders with floating-point noise in M:SS form —
+// a plain "X.XX min" reads cleaner here than fixing up the remainder.
+function formatAvgMinutes(seconds: number | null): string {
+  if (seconds == null) return "—";
+  return `${(seconds / 60).toFixed(2)} min`;
 }
 
 export function JustCallSection({ summary }: { summary: JustCallSummary }) {
@@ -59,7 +67,7 @@ export function JustCallSection({ summary }: { summary: JustCallSummary }) {
           />
         </div>
         <div className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm">
-          <Metric label="Avg Call Duration" value={formatCallDuration(avgDurationSeconds)} />
+          <Metric label="Avg Call Duration" value={formatAvgMinutes(avgDurationSeconds)} />
         </div>
         <div className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm">
           <Metric label="Inbound / Outbound" value={`${incoming.toLocaleString()} / ${outgoing.toLocaleString()}`} />
