@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { KeapBroadcastForm } from "./KeapBroadcastForm";
+import { OPEN_RATE_CAVEAT } from "@/lib/open-rate-caveat";
 
 export type BroadcastCardData = {
   id: number;
@@ -20,9 +21,9 @@ function pct(numerator: number, denominator: number): string {
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" title={title}>
       <span className="text-2xl font-bold text-charcoal font-heading">{value}</span>
       <span className="text-xs uppercase tracking-wide text-body-gray">{label}</span>
     </div>
@@ -102,7 +103,11 @@ export function BroadcastCard({ broadcast }: { broadcast: BroadcastCardData }) {
         <Metric label="Opens" value={broadcast.opens.toLocaleString()} />
         <Metric label="Clicks" value={broadcast.clicks.toLocaleString()} />
         <Metric label="Replies" value={broadcast.replies.toLocaleString()} />
-        <Metric label="Open rate" value={pct(broadcast.opens, broadcast.emailsDelivered)} />
+        <Metric
+          label="Open rate*"
+          value={pct(broadcast.opens, broadcast.emailsDelivered)}
+          title={OPEN_RATE_CAVEAT}
+        />
         <Metric label="CTR" value={pct(broadcast.clicks, broadcast.emailsDelivered)} />
       </div>
     </div>

@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import type { JustCallSummary } from "@/lib/data";
 import { DonutChart } from "@/components/DonutChart";
 import { HorizontalBarList } from "@/components/HorizontalBarList";
 import { SectionTabs } from "@/components/SectionTabs";
 import { Metric } from "@/components/Metric";
+import { JustCallRangeSelect } from "@/components/JustCallRangeSelect";
 
 function formatCallDuration(seconds: number | null): string {
   if (seconds == null) return "—";
@@ -12,11 +14,23 @@ function formatCallDuration(seconds: number | null): string {
 }
 
 export function JustCallSection({ summary }: { summary: JustCallSummary }) {
+  const rangeSelect = (
+    <div className="mb-4 flex justify-end">
+      <Suspense fallback={null}>
+        <JustCallRangeSelect />
+      </Suspense>
+    </div>
+  );
+
   if (summary.totalCalls === 0) {
     return (
-      <p className="text-body-gray">
-        No JustCall calls synced yet — click &quot;Sync Now&quot; above.
-      </p>
+      <div>
+        {rangeSelect}
+        <p className="text-body-gray">
+          No JustCall calls in this range — try widening it, or click
+          &quot;Sync Now&quot; if nothing has synced yet.
+        </p>
+      </div>
     );
   }
 
@@ -110,12 +124,15 @@ export function JustCallSection({ summary }: { summary: JustCallSummary }) {
   );
 
   return (
-    <SectionTabs
-      accent="border-sky-500"
-      tabs={[
-        { label: "Overview", content: overviewTab },
-        { label: "Recent Calls", content: recentTab },
-      ]}
-    />
+    <div>
+      {rangeSelect}
+      <SectionTabs
+        accent="border-sky-500"
+        tabs={[
+          { label: "Overview", content: overviewTab },
+          { label: "Recent Calls", content: recentTab },
+        ]}
+      />
+    </div>
   );
 }

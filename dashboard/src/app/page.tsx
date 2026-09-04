@@ -28,8 +28,8 @@ import { StatusFilter } from "@/components/StatusFilter";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { CarrierEditor } from "@/components/CarrierEditor";
 import { AutomationGoalEditor } from "@/components/AutomationGoalEditor";
-import { KeapBroadcastForm } from "@/components/KeapBroadcastForm";
-import { ChannelBlendUpload } from "@/components/ChannelBlendUpload";
+import { LogBroadcastButton } from "@/components/LogBroadcastButton";
+import { UploadChannelBlendButton } from "@/components/UploadChannelBlendButton";
 import { ChannelBlendUploadHistory } from "@/components/ChannelBlendUploadHistory";
 import { ChannelBlendPatternsCard } from "@/components/ChannelBlendPatternsCard";
 import { HorizontalBarList } from "@/components/HorizontalBarList";
@@ -52,6 +52,7 @@ import { BroadcastCard } from "@/components/BroadcastCard";
 import { DispositionRow } from "@/components/DispositionRow";
 import { ExecutiveSummaryCard } from "@/components/ExecutiveSummaryCard";
 import { SentimentBreakdown } from "@/components/SentimentBreakdown";
+import { OPEN_RATE_CAVEAT } from "@/lib/open-rate-caveat";
 
 function StatusPill({ status }: { status: string | null }) {
   const isRunning = status === "RUNNING" || status === "PUBLISHED";
@@ -142,7 +143,9 @@ function SourceSummaryTable({
             <th className="py-2 pr-4">Sent</th>
             <th className="py-2 pr-4">Delivered</th>
             <th className="py-2 pr-4">Opens</th>
-            <th className="py-2 pr-4">Open Rate</th>
+            <th className="py-2 pr-4" title={OPEN_RATE_CAVEAT}>
+              Open Rate*
+            </th>
             <th className="py-2 pr-4">Clicks</th>
             <th className="py-2 pr-4">CTR</th>
           </tr>
@@ -209,7 +212,9 @@ function CarrierSummaryTable({
             <th className="py-2 pr-4">Sent</th>
             <th className="py-2 pr-4">Delivered</th>
             <th className="py-2 pr-4">Opens</th>
-            <th className="py-2 pr-4">Open Rate</th>
+            <th className="py-2 pr-4" title={OPEN_RATE_CAVEAT}>
+              Open Rate*
+            </th>
             <th className="py-2 pr-4">Clicks</th>
           </tr>
         </thead>
@@ -399,7 +404,9 @@ function KeapBroadcastsList({
 }) {
   return (
     <div>
-      <KeapBroadcastForm />
+      <div className="mb-4 flex justify-end">
+        <LogBroadcastButton />
+      </div>
       {broadcasts.length === 0 ? (
         <p className="text-body-gray">
           No broadcasts logged yet — Keap&apos;s API doesn&apos;t expose
@@ -507,7 +514,9 @@ function ChannelBlendSection({
 
   const uploadTab = (
     <div>
-      <ChannelBlendUpload />
+      <div className="mb-4 flex justify-end">
+        <UploadChannelBlendButton />
+      </div>
       <ChannelBlendUploadHistory uploads={uploads} />
     </div>
   );
@@ -638,6 +647,27 @@ export default async function Home({
   const zendeskAssigneeParam =
     typeof params.zendeskAssignee === "string" ? params.zendeskAssignee : "all";
 
+  const justcallRangeParam =
+    typeof params.justcallRange === "string" ? params.justcallRange : "30";
+  const justcallFromParam =
+    typeof params.justcallFrom === "string" ? params.justcallFrom : "";
+  const justcallToParam =
+    typeof params.justcallTo === "string" ? params.justcallTo : "";
+
+  const justcallRange =
+    justcallRangeParam === "all"
+      ? undefined
+      : justcallRangeParam === "custom" && justcallFromParam
+      ? {
+          since: new Date(justcallFromParam),
+          until: justcallToParam ? new Date(justcallToParam) : undefined,
+        }
+      : (() => {
+          const since = new Date();
+          since.setDate(since.getDate() - Number(justcallRangeParam || "30"));
+          return { since };
+        })();
+
   const [
     allCampaigns,
     sourceSummary,
@@ -678,7 +708,7 @@ export default async function Home({
       zendeskAssigneeParam === "all" ? undefined : zendeskAssigneeParam
     ),
     getZendeskFilterOptions(),
-    getJustCallSummary(),
+    getJustCallSummary(justcallRange),
     getZendeskTopicsSummary(),
     getAllSourcesDigest(),
     getKeapAutomationEventVolume(eventsRange),
@@ -724,6 +754,18 @@ export default async function Home({
                 ]}
               />
               <SectionBlock id="overview-all-sources" title="All Sources — Overview" accent="border-charcoal">
+                {(() => {
+                  const connectedSources = sourceSummary.filter((r) => r.connected);
+                  const totalOutflow = connectedSources.reduce((sum, r) => sum + r.sent, 0);
+                  return (
+                    <div className="mb-4 rounded-3xl border-l-4 border-brand-green bg-white p-6 shadow-sm">
+                      <Metric label="Total Email Outflow" value={totalOutflow.toLocaleString()} />
+                      <p className="mt-2 text-xs text-body-gray">
+                        {connectedSources.map((r) => `${r.label.split(" (")[0]}: ${r.sent.toLocaleString()}`).join(" · ")}
+                      </p>
+                    </div>
+                  );
+                })()}
                 <AllSourcesDigestCard digest={allSourcesDigest} />
                 <div className="mb-4 flex justify-end">
                   <Suspense fallback={null}>
@@ -930,7 +972,9 @@ export default async function Home({
 
                         <div className="flex flex-wrap gap-x-8 gap-y-2">
                           <Metric size="sm" label="Sent" value={sent.toLocaleString()} />
-                          <Metric size="sm" label="Open rate" value={openRate} />
+                          <div title={OPEN_RATE_CAVEAT}>
+                            <Metric size="sm" label="Open rate*" value={openRate} />
+                          </div>
                           <Metric
                             size="sm"
                             label="Clicked"
