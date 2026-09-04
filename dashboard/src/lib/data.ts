@@ -470,14 +470,27 @@ export type CarrierSummaryRow = {
   delivered: number;
   opened: number;
   clicked: number;
+  byChannel: { channel: string; sent: number }[];
 };
+
+const CHANNEL_LABELS: Record<string, string> = {
+  woodpecker: "Woodpecker",
+  keap: "Keap Automations",
+};
+
+function bumpChannel(row: CarrierSummaryRow, channel: string, sent: number) {
+  if (sent === 0) return;
+  const entry = row.byChannel.find((c) => c.channel === channel);
+  if (entry) entry.sent += sent;
+  else row.byChannel.push({ channel, sent });
+}
 
 export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
   const supabase = supabaseServer();
 
   const { data: allCampaigns, error: campaignsErr } = await supabase
     .from("campaigns")
-    .select("id, carrier, category, exclude_from_metrics");
+    .select("id, source, carrier, category, exclude_from_metrics");
   if (campaignsErr) throw campaignsErr;
   // Filtered in JS, not SQL — a `.neq()` on a nullable column silently drops
   // every row where category IS NULL (Woodpecker campaigns never set it).
@@ -507,12 +520,14 @@ export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
       delivered: 0,
       opened: 0,
       clicked: 0,
+      byChannel: [],
     };
     const s = latestByCampaign.get(c.id);
     row.sent += s?.sent ?? 0;
     row.delivered += s?.delivered ?? 0;
     row.opened += s?.opened ?? 0;
     row.clicked += s?.clicked ?? 0;
+    bumpChannel(row, CHANNEL_LABELS[c.source] ?? c.source, s?.sent ?? 0);
     byCarrier.set(carrier, row);
   }
 
@@ -528,12 +543,14 @@ export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
       delivered: 0,
       opened: 0,
       clicked: 0,
+      byChannel: [],
     };
     // Broadcasts only capture "delivered," not a separate sent count.
     row.sent += b.emails_delivered;
     row.delivered += b.emails_delivered;
     row.opened += b.opens;
     row.clicked += b.clicks;
+    bumpChannel(row, "Keap Broadcasts", b.emails_delivered);
     byCarrier.set(carrier, row);
   }
 

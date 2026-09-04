@@ -210,6 +210,7 @@ function CarrierSummaryTable({
           <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
             <th className="py-2 pr-4">Carrier</th>
             <th className="py-2 pr-4">Sent</th>
+            <th className="py-2 pr-4">By Channel</th>
             <th className="py-2 pr-4">Delivered</th>
             <th className="py-2 pr-4">Opens</th>
             <th className="py-2 pr-4" title={OPEN_RATE_CAVEAT}>
@@ -223,6 +224,14 @@ function CarrierSummaryTable({
             <tr key={r.carrier} className="border-b border-black/5">
               <td className="py-3 pr-4 font-semibold text-charcoal">{r.carrier}</td>
               <td className="py-3 pr-4">{r.sent.toLocaleString()}</td>
+              <td className="py-3 pr-4 text-xs text-body-gray">
+                {r.byChannel.length > 0
+                  ? [...r.byChannel]
+                      .sort((a, b) => b.sent - a.sent)
+                      .map((c) => `${c.channel}: ${c.sent.toLocaleString()}`)
+                      .join(" · ")
+                  : "—"}
+              </td>
               <td className="py-3 pr-4">{r.delivered.toLocaleString()}</td>
               <td className="py-3 pr-4">{r.opened.toLocaleString()}</td>
               <td className="py-3 pr-4">{pct(r.opened, r.delivered)}</td>
@@ -781,22 +790,16 @@ export default async function Home({
                   />
                   <VolumeTrendChart points={volumeTrend} />
                 </div>
-                <Collapsible label="full source breakdown table">
-                  <SourceSummaryTable rows={sourceSummary} />
-                </Collapsible>
+                <SourceSummaryTable rows={sourceSummary} />
               </SectionBlock>
 
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
                 <SectionBlock id="overview-carrier" title="By Carrier" accent="border-charcoal">
-                  <Collapsible label="carrier breakdown table">
-                    <CarrierSummaryTable rows={carrierSummary} />
-                  </Collapsible>
+                  <CarrierSummaryTable rows={carrierSummary} />
                 </SectionBlock>
 
                 <SectionBlock id="overview-vip" title="VIP Form Submissions" accent="border-charcoal">
-                  <Collapsible label="VIP submissions table">
-                    <VipSubmissionsWidget submissions={vipSubmissions} />
-                  </Collapsible>
+                  <VipSubmissionsWidget submissions={vipSubmissions} />
                 </SectionBlock>
               </div>
             </>
