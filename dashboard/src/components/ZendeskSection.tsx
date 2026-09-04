@@ -80,12 +80,13 @@ export function ZendeskSection({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+      <div className="rounded-3xl bg-white p-6 shadow-sm">
         <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
           Recent Tickets
         </h3>
+        <div className="max-h-72 overflow-y-auto overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-sm">
-          <thead>
+          <thead className="sticky top-0 bg-white">
             <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
               <th className="py-2 pr-4">Subject</th>
               <th className="py-2 pr-4">Requester</th>
@@ -110,6 +111,7 @@ export function ZendeskSection({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
