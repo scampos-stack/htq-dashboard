@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { syncKeap } from "@/lib/sync-keap";
 import { syncWoodpecker } from "@/lib/sync-woodpecker";
 import { syncZendesk } from "@/lib/sync-zendesk";
+import { syncJustCall } from "@/lib/sync-justcall";
 import { generateWoodpeckerExecutiveSummary, generateZendeskTopicsSummary } from "@/lib/generate-summary";
 import { errorMessage } from "@/lib/error-message";
 
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const [keap, woodpecker, zendesk] = await Promise.allSettled([
+  const [keap, woodpecker, zendesk, justcall] = await Promise.allSettled([
     syncKeap(),
     syncWoodpecker().then(async (result) => {
       const aiSummary = await generateWoodpeckerExecutiveSummary().catch((err) => {
@@ -36,6 +37,7 @@ export async function GET(req: Request) {
       }
       return result;
     }),
+    syncJustCall(),
   ]);
 
   const summarize = (label: string, r: PromiseSettledResult<Record<string, unknown>>) =>
@@ -43,7 +45,12 @@ export async function GET(req: Request) {
       ? { source: label, ok: true, ...r.value }
       : { source: label, ok: false, error: errorMessage(r.reason) };
 
-  const results = [summarize("keap", keap), summarize("woodpecker", woodpecker), summarize("zendesk", zendesk)];
+  const results = [
+    summarize("keap", keap),
+    summarize("woodpecker", woodpecker),
+    summarize("zendesk", zendesk),
+    summarize("justcall", justcall),
+  ];
   for (const r of results) {
     if (!r.ok) console.error(`[cron] ${r.source} failed:`, r.error);
   }

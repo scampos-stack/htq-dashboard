@@ -14,6 +14,7 @@ import {
   getChannelBlendCategoryPatterns,
   getZendeskSummary,
   getZendeskFilterOptions,
+  getJustCallSummary,
   getZendeskTopicsSummary,
   getAllSourcesDigest,
   getDailyVolumeTrend,
@@ -40,6 +41,7 @@ import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { CampaignEmailContent } from "@/components/CampaignEmailContent";
 import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
 import { ZendeskSection } from "@/components/ZendeskSection";
+import { JustCallSection } from "@/components/JustCallSection";
 import { AllSourcesDigestCard } from "@/components/AllSourcesDigestCard";
 import { VolumeTrendChart } from "@/components/VolumeTrendChart";
 import { SectionTabs } from "@/components/SectionTabs";
@@ -650,6 +652,7 @@ export default async function Home({
     channelBlendPatterns,
     zendeskSummary,
     zendeskFilterOptions,
+    justCallSummary,
     zendeskTopicsSummary,
     allSourcesDigest,
     keapAutomationEvents,
@@ -675,6 +678,7 @@ export default async function Home({
       zendeskAssigneeParam === "all" ? undefined : zendeskAssigneeParam
     ),
     getZendeskFilterOptions(),
+    getJustCallSummary(),
     getZendeskTopicsSummary(),
     getAllSourcesDigest(),
     getKeapAutomationEventVolume(eventsRange),
@@ -999,14 +1003,26 @@ export default async function Home({
           )}
 
           {showSupport && (
-            <SectionBlock title="Zendesk" accent="border-teal-500">
-              <ZendeskSection
-                summary={zendeskSummary}
-                topicsSummary={zendeskTopicsSummary}
-                groupOptions={zendeskFilterOptions.groups}
-                assigneeOptions={zendeskFilterOptions.assignees}
+            <>
+              <JumpNav
+                items={[
+                  { id: "support-zendesk", label: "Zendesk", dot: "bg-teal-500" },
+                  { id: "support-justcall", label: "JustCall", dot: "bg-sky-500" },
+                ]}
               />
-            </SectionBlock>
+              <SectionBlock id="support-zendesk" title="Zendesk" accent="border-teal-500">
+                <ZendeskSection
+                  summary={zendeskSummary}
+                  topicsSummary={zendeskTopicsSummary}
+                  groupOptions={zendeskFilterOptions.groups}
+                  assigneeOptions={zendeskFilterOptions.assignees}
+                />
+              </SectionBlock>
+
+              <SectionBlock id="support-justcall" title="JustCall" accent="border-sky-500">
+                <JustCallSection summary={justCallSummary} />
+              </SectionBlock>
+            </>
           )}
         </main>
       </div>

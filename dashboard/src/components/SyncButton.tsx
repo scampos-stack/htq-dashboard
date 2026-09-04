@@ -40,11 +40,12 @@ export function SyncButton() {
     // Separate requests (not one combined endpoint) — each source gets its
     // own function timeout instead of all four sharing one budget, so a
     // slow source (e.g. a large Keap email backlog) can't sink the others.
-    const [woodpecker, keap, keapEmails, zendesk] = await Promise.all([
+    const [woodpecker, keap, keapEmails, zendesk, justcall] = await Promise.all([
       callSync("/api/sync/woodpecker"),
       callSync("/api/sync/keap"),
       callSync("/api/sync/keap-emails"),
       callSync("/api/sync/zendesk"),
+      callSync("/api/sync/justcall"),
     ]);
 
     const parts: string[] = [];
@@ -90,7 +91,15 @@ export function SyncButton() {
       parts.push(`Zendesk metrics: ${zendesk.metrics}`);
     }
 
-    const anyOk = [woodpecker, keap, keapEmails, zendesk].some((r) => r.ok !== false);
+    if (justcall.calls != null) {
+      parts.push(
+        `JustCall: ${justcall.calls} calls${justcall.cappedByRateLimit ? " (still catching up)" : ""}`
+      );
+    } else if (justcall.error) {
+      parts.push(`JustCall failed: ${justcall.error}`);
+    }
+
+    const anyOk = [woodpecker, keap, keapEmails, zendesk, justcall].some((r) => r.ok !== false);
     setStatus(anyOk ? "done" : "error");
     setMessage(parts.join(" · ") || "Synced");
     router.refresh();

@@ -1085,6 +1085,116 @@ export async function getZendeskSummary(
   };
 }
 
+export type JustCallSummary = {
+  totalCalls: number;
+  byDirection: { direction: string; count: number }[];
+  byType: { type: string; count: number }[];
+  byAgent: { label: string; count: number; avgDurationSeconds: number | null }[];
+  topDispositions: { disposition: string; count: number }[];
+  recent: {
+    id: number;
+    contactNumber: string | null;
+    contactName: string | null;
+    agentName: string | null;
+    direction: string | null;
+    type: string | null;
+    disposition: string | null;
+    durationSeconds: number | null;
+    recordingUrl: string | null;
+    callAt: string;
+  }[];
+};
+
+const EMPTY_JUSTCALL_SUMMARY: JustCallSummary = {
+  totalCalls: 0,
+  byDirection: [],
+  byType: [],
+  byAgent: [],
+  topDispositions: [],
+  recent: [],
+};
+
+export async function getJustCallSummary(range?: ZendeskDateRange): Promise<JustCallSummary> {
+  const supabase = supabaseServer();
+
+  let query = supabase
+    .from("justcall_calls")
+    .select(
+      "id, contact_number, contact_name, agent_name, direction, call_type, disposition, duration_seconds, recording_url, call_at"
+    )
+    .order("call_at", { ascending: false });
+  if (range) {
+    query = query.gte("call_at", range.since.toISOString());
+    if (range.until) query = query.lte("call_at", range.until.toISOString());
+  }
+  const { data, error } = await query;
+  // The migration adding justcall_calls may not have been run yet — this
+  // feeds the same Promise.all as the rest of the page, so a missing table
+  // here would otherwise take down the entire dashboard rather than just
+  // this one section.
+  if (error) {
+    console.error("[getJustCallSummary] query failed (has migration 017 been run?):", error);
+    return EMPTY_JUSTCALL_SUMMARY;
+  }
+
+  const rows = data ?? [];
+  const directionMap = new Map<string, number>();
+  const typeMap = new Map<string, number>();
+  const dispositionMap = new Map<string, number>();
+  const agentMap = new Map<string, { count: number; durations: number[] }>();
+
+  for (const r of rows) {
+    const direction = r.direction || "Unknown";
+    directionMap.set(direction, (directionMap.get(direction) ?? 0) + 1);
+
+    const type = r.call_type || "unknown";
+    typeMap.set(type, (typeMap.get(type) ?? 0) + 1);
+
+    if (r.disposition) {
+      dispositionMap.set(r.disposition, (dispositionMap.get(r.disposition) ?? 0) + 1);
+    }
+
+    const agent = r.agent_name || "Unassigned";
+    const agentEntry = agentMap.get(agent) ?? { count: 0, durations: [] };
+    agentEntry.count += 1;
+    if (r.duration_seconds != null) agentEntry.durations.push(r.duration_seconds);
+    agentMap.set(agent, agentEntry);
+  }
+
+  return {
+    totalCalls: rows.length,
+    byDirection: [...directionMap.entries()]
+      .map(([direction, count]) => ({ direction, count }))
+      .sort((a, b) => b.count - a.count),
+    byType: [...typeMap.entries()]
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count),
+    byAgent: [...agentMap.entries()]
+      .map(([agent, e]) => ({
+        label: agent,
+        count: e.count,
+        avgDurationSeconds: average(e.durations),
+      }))
+      .sort((a, b) => b.count - a.count),
+    topDispositions: [...dispositionMap.entries()]
+      .map(([disposition, count]) => ({ disposition, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    recent: rows.slice(0, 25).map((r) => ({
+      id: r.id,
+      contactNumber: r.contact_number,
+      contactName: r.contact_name,
+      agentName: r.agent_name,
+      direction: r.direction,
+      type: r.call_type,
+      disposition: r.disposition,
+      durationSeconds: r.duration_seconds,
+      recordingUrl: r.recording_url,
+      callAt: r.call_at,
+    })),
+  };
+}
+
 export type ZendeskTopicsSummary = {
   summary: string;
   generatedAt: string;
