@@ -92,7 +92,56 @@ type CallsResponse = {
   next_page_link?: string | null;
 };
 
-export async function syncJustCall(): Promise<{ calls: number; cappedByRateLimit: boolean }> {
+const MAX_AI_BACKFILL_PER_RUN = 50;
+
+// The main sync loop above only ever touches calls from the cursor forward
+// (new calls) — it can't retroactively add AI data to calls that were
+// already synced before fetch_ai_data=true existed. Confirmed live: 0 of
+// 2,749 already-synced calls had call_score populated, since barely any
+// new calls had landed since. Same fix as the Zendesk ticket-metrics
+// backfill: pick the N most-recently-called calls still missing AI data
+// and re-fetch each one individually by id. Calls with 0 duration (missed/
+// bot dials) never get analyzed by JustCall in the first place, so they're
+// excluded rather than wasting a request confirming they're still empty.
+async function backfillJustCallAiData(): Promise<number> {
+  const supabase = supabaseServer();
+
+  const { data: missing, error: missingErr } = await supabase
+    .from("justcall_calls")
+    .select("id")
+    .is("call_score", null)
+    .gt("duration_seconds", 0)
+    .order("call_at", { ascending: false })
+    .limit(MAX_AI_BACKFILL_PER_RUN);
+  if (missingErr) throw missingErr;
+  if (!missing?.length) return 0;
+
+  let total = 0;
+  for (const { id } of missing) {
+    const data: { data?: JustCallCall } = await jcFetch(`${API_BASE}/calls/${id}?fetch_ai_data=true`);
+    const c = data.data;
+    if (!c) continue;
+
+    const { error } = await supabase
+      .from("justcall_calls")
+      .update({
+        call_score: c.justcall_ai?.call_score || null,
+        customer_sentiment: c.justcall_ai?.customer_sentiment || null,
+        call_moments: c.justcall_ai?.call_moments?.length ? c.justcall_ai.call_moments : null,
+      })
+      .eq("id", id);
+    if (error) throw error;
+    total += 1;
+  }
+
+  return total;
+}
+
+export async function syncJustCall(): Promise<{
+  calls: number;
+  cappedByRateLimit: boolean;
+  aiBackfilled: number;
+}> {
   const supabase = supabaseServer();
   const since = await getCursor();
 
@@ -163,5 +212,14 @@ export async function syncJustCall(): Promise<{ calls: number; cappedByRateLimit
       : toJustCallDatetime(new Date())
   );
 
-  return { calls: total, cappedByRateLimit };
+  // Additive on top of the call sync already saved above — don't fail the
+  // whole sync over AI backfill.
+  let aiBackfilled = 0;
+  try {
+    aiBackfilled = await backfillJustCallAiData();
+  } catch (err) {
+    console.error("[sync] justcall AI backfill failed:", err);
+  }
+
+  return { calls: total, cappedByRateLimit, aiBackfilled };
 }

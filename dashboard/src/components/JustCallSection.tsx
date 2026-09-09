@@ -56,7 +56,7 @@ export function JustCallSection({ summary }: { summary: JustCallSummary }) {
 
   const overviewTab = (
     <div>
-      <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <div className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm">
           <Metric label="Total Calls" value={summary.totalCalls.toLocaleString()} />
         </div>

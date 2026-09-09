@@ -95,6 +95,9 @@ export function SyncButton() {
       parts.push(
         `JustCall: ${justcall.calls} calls${justcall.cappedByRateLimit ? " (still catching up)" : ""}`
       );
+      if (justcall.aiBackfilled) {
+        parts.push(`JustCall AI backfilled: ${justcall.aiBackfilled}`);
+      }
     } else if (justcall.error) {
       parts.push(`JustCall failed: ${justcall.error}`);
     }
