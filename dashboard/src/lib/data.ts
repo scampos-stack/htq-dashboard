@@ -1144,8 +1144,17 @@ export type JustCallSummary = {
   totalCalls: number;
   byDirection: { direction: string; count: number }[];
   byType: { type: string; count: number }[];
-  byAgent: { label: string; count: number; avgDurationSeconds: number | null }[];
+  byAgent: {
+    label: string;
+    count: number;
+    avgDurationSeconds: number | null;
+    totalDurationSeconds: number;
+    byDisposition: { disposition: string; totalDurationSeconds: number }[];
+  }[];
   topDispositions: { disposition: string; count: number }[];
+  topTopics: { topic: string; count: number }[];
+  avgCallScore: number | null;
+  sentimentBreakdown: { sentiment: string; count: number }[];
   recent: {
     id: number;
     contactNumber: string | null;
@@ -1166,6 +1175,9 @@ const EMPTY_JUSTCALL_SUMMARY: JustCallSummary = {
   byType: [],
   byAgent: [],
   topDispositions: [],
+  topTopics: [],
+  avgCallScore: null,
+  sentimentBreakdown: [],
   recent: [],
 };
 
@@ -1175,28 +1187,57 @@ export async function getJustCallSummary(range?: ZendeskDateRange): Promise<Just
   let query = supabase
     .from("justcall_calls")
     .select(
-      "id, contact_number, contact_name, agent_name, direction, call_type, disposition, duration_seconds, recording_url, call_at"
+      "id, contact_number, contact_name, agent_name, direction, call_type, disposition, duration_seconds, recording_url, call_at, call_score, customer_sentiment, call_moments"
     )
     .order("call_at", { ascending: false });
   if (range) {
     query = query.gte("call_at", range.since.toISOString());
     if (range.until) query = query.lte("call_at", range.until.toISOString());
   }
-  const { data, error } = await query;
-  // The migration adding justcall_calls may not have been run yet — this
-  // feeds the same Promise.all as the rest of the page, so a missing table
-  // here would otherwise take down the entire dashboard rather than just
-  // this one section.
+  let { data, error } = await query;
+  // The migration adding justcall_calls (017) or its AI columns (019) may
+  // not have been run yet — this feeds the same Promise.all as the rest of
+  // the page, so a missing table/column here shouldn't take down the whole
+  // dashboard. Retry without the AI columns once before giving up entirely.
   if (error) {
-    console.error("[getJustCallSummary] query failed (has migration 017 been run?):", error);
-    return EMPTY_JUSTCALL_SUMMARY;
+    console.error(
+      "[getJustCallSummary] query failed (has migration 019 been run?), retrying without AI columns:",
+      error
+    );
+    let fallbackQuery = supabase
+      .from("justcall_calls")
+      .select(
+        "id, contact_number, contact_name, agent_name, direction, call_type, disposition, duration_seconds, recording_url, call_at"
+      )
+      .order("call_at", { ascending: false });
+    if (range) {
+      fallbackQuery = fallbackQuery.gte("call_at", range.since.toISOString());
+      if (range.until) fallbackQuery = fallbackQuery.lte("call_at", range.until.toISOString());
+    }
+    const fallback = await fallbackQuery;
+    if (fallback.error) {
+      console.error("[getJustCallSummary] fallback query also failed (has migration 017 been run?):", fallback.error);
+      return EMPTY_JUSTCALL_SUMMARY;
+    }
+    data = fallback.data?.map((r) => ({
+      ...r,
+      call_score: null as number | null,
+      customer_sentiment: null as string | null,
+      call_moments: null as string[] | null,
+    }));
   }
 
   const rows = data ?? [];
   const directionMap = new Map<string, number>();
   const typeMap = new Map<string, number>();
   const dispositionMap = new Map<string, number>();
-  const agentMap = new Map<string, { count: number; durations: number[] }>();
+  const topicMap = new Map<string, number>();
+  const sentimentMap = new Map<string, number>();
+  const callScores: number[] = [];
+  const agentMap = new Map<
+    string,
+    { count: number; durations: number[]; byDisposition: Map<string, number> }
+  >();
 
   for (const r of rows) {
     const direction = r.direction || "Unknown";
@@ -1209,10 +1250,28 @@ export async function getJustCallSummary(range?: ZendeskDateRange): Promise<Just
       dispositionMap.set(r.disposition, (dispositionMap.get(r.disposition) ?? 0) + 1);
     }
 
+    for (const topic of r.call_moments ?? []) {
+      topicMap.set(topic, (topicMap.get(topic) ?? 0) + 1);
+    }
+
+    if (r.customer_sentiment) {
+      sentimentMap.set(r.customer_sentiment, (sentimentMap.get(r.customer_sentiment) ?? 0) + 1);
+    }
+
+    if (r.call_score != null && r.call_score > 0) callScores.push(r.call_score);
+
     const agent = r.agent_name || "Unassigned";
-    const agentEntry = agentMap.get(agent) ?? { count: 0, durations: [] };
+    const agentEntry = agentMap.get(agent) ?? { count: 0, durations: [], byDisposition: new Map<string, number>() };
     agentEntry.count += 1;
-    if (r.duration_seconds != null) agentEntry.durations.push(r.duration_seconds);
+    if (r.duration_seconds != null) {
+      agentEntry.durations.push(r.duration_seconds);
+      if (r.disposition) {
+        agentEntry.byDisposition.set(
+          r.disposition,
+          (agentEntry.byDisposition.get(r.disposition) ?? 0) + r.duration_seconds
+        );
+      }
+    }
     agentMap.set(agent, agentEntry);
   }
 
@@ -1229,12 +1288,24 @@ export async function getJustCallSummary(range?: ZendeskDateRange): Promise<Just
         label: agent,
         count: e.count,
         avgDurationSeconds: average(e.durations),
+        totalDurationSeconds: e.durations.reduce((sum, d) => sum + d, 0),
+        byDisposition: [...e.byDisposition.entries()]
+          .map(([disposition, totalDurationSeconds]) => ({ disposition, totalDurationSeconds }))
+          .sort((a, b) => b.totalDurationSeconds - a.totalDurationSeconds),
       }))
       .sort((a, b) => b.count - a.count),
     topDispositions: [...dispositionMap.entries()]
       .map(([disposition, count]) => ({ disposition, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10),
+    topTopics: [...topicMap.entries()]
+      .map(([topic, count]) => ({ topic, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    avgCallScore: average(callScores),
+    sentimentBreakdown: [...sentimentMap.entries()]
+      .map(([sentiment, count]) => ({ sentiment, count }))
+      .sort((a, b) => b.count - a.count),
     recent: rows.slice(0, 25).map((r) => ({
       id: r.id,
       contactNumber: r.contact_number,

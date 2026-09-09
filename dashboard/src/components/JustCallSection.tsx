@@ -72,6 +72,12 @@ export function JustCallSection({ summary }: { summary: JustCallSummary }) {
         <div className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm">
           <Metric label="Inbound / Outbound" value={`${incoming.toLocaleString()} / ${outgoing.toLocaleString()}`} />
         </div>
+        <div className="rounded-3xl border-l-4 border-amber-500 bg-white p-6 shadow-sm">
+          <Metric
+            label="Avg Call Score"
+            value={summary.avgCallScore != null ? summary.avgCallScore.toFixed(0) : "—"}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -79,21 +85,65 @@ export function JustCallSection({ summary }: { summary: JustCallSummary }) {
           title="Calls by Direction"
           segments={summary.byDirection.map((d) => ({ label: d.direction, value: d.count }))}
         />
-        {summary.topDispositions.length > 0 && (
-          <HorizontalBarList
-            title="Top Dispositions"
-            accent="bg-sky-500"
-            rows={summary.topDispositions.map((d) => ({ label: d.disposition, count: d.count }))}
+        {summary.sentimentBreakdown.length > 0 && (
+          <DonutChart
+            title="Customer Sentiment"
+            description="From JustCall AI's call analysis — only calls with enough real conversation get scored."
+            segments={summary.sentimentBreakdown.map((s) => ({
+              label: s.sentiment,
+              value: s.count,
+              color: s.sentiment === "Positive" ? "#7cb342" : s.sentiment === "Negative" ? "#d03b3b" : undefined,
+            }))}
           />
         )}
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {summary.topTopics.length > 0 && (
+          <HorizontalBarList
+            title="Top Topics"
+            description="From JustCall AI's call analysis."
+            accent="bg-sky-500"
+            rows={summary.topTopics.map((t) => ({ label: t.topic, count: t.count }))}
+          />
+        )}
         <HorizontalBarList
           title="Calls by Agent"
           accent="bg-sky-500"
           rows={summary.byAgent.map((a) => ({ label: a.label, count: a.count }))}
         />
+      </div>
+
+      <div className="mt-5 overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
+        <h3 className="mb-1 font-heading text-base font-semibold text-charcoal">
+          Time Spent by Agent
+        </h3>
+        <p className="mb-4 text-xs text-body-gray">By disposition — where each agent's call time actually went.</p>
+        <table className="w-full min-w-[560px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
+              <th className="py-2 pr-4">Agent</th>
+              <th className="py-2 pr-4">Total Time</th>
+              <th className="py-2 pr-4">By Disposition</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.byAgent.map((a) => (
+              <tr key={a.label} className="border-b border-black/5">
+                <td className="py-3 pr-4 font-semibold text-charcoal">{a.label}</td>
+                <td className="py-3 pr-4">{formatAvgMinutes(a.totalDurationSeconds)}</td>
+                <td className="py-3 pr-4 text-xs text-body-gray">
+                  {a.byDisposition.length > 0
+                    ? a.byDisposition
+                        .slice(0, 3)
+                        .map((d) => `${d.disposition}: ${formatAvgMinutes(d.totalDurationSeconds)}`)
+                        .join(" · ")
+                    : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

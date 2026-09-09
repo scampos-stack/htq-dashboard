@@ -80,6 +80,11 @@ type JustCallCall = {
   call_duration: {
     total_duration: number;
   };
+  justcall_ai?: {
+    call_moments?: string[];
+    call_score?: number;
+    customer_sentiment?: string;
+  };
 };
 
 type CallsResponse = {
@@ -98,7 +103,7 @@ export async function syncJustCall(): Promise<{ calls: number; cappedByRateLimit
   // would jump the cursor straight to "now" while silently skipping every
   // older unprocessed call in between — permanently, since nothing revisits
   // that gap afterward.
-  let url = `${API_BASE}/calls?per_page=100&from_datetime=${encodeURIComponent(since)}&sort=id&order=asc`;
+  let url = `${API_BASE}/calls?per_page=100&fetch_ai_data=true&from_datetime=${encodeURIComponent(since)}&sort=id&order=asc`;
   let total = 0;
   let latestCallAt: string | null = null;
   let cappedByRateLimit = false;
@@ -129,6 +134,11 @@ export async function syncJustCall(): Promise<{ calls: number; cappedByRateLimit
         duration_seconds: c.call_duration?.total_duration ?? null,
         recording_url: c.call_info?.recording || null,
         cost_incurred: c.cost_incurred ?? null,
+        // Only populated for analyzed calls (answered, with real duration) —
+        // missed calls come back with score 0 / empty sentiment / no moments.
+        call_score: c.justcall_ai?.call_score || null,
+        customer_sentiment: c.justcall_ai?.customer_sentiment || null,
+        call_moments: c.justcall_ai?.call_moments?.length ? c.justcall_ai.call_moments : null,
       };
     });
 
