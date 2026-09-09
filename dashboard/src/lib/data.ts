@@ -941,6 +941,10 @@ export type ZendeskGroupedStat = {
   avgResolutionMinutes: number | null;
 };
 
+export type ZendeskAgentStat = ZendeskGroupedStat & {
+  byRequestType: { requestType: string; totalResolutionMinutes: number }[];
+};
+
 export type ZendeskSummary = {
   totalRows: number;
   byStatus: { status: string; count: number }[];
@@ -949,7 +953,7 @@ export type ZendeskSummary = {
   csat: { good: number; bad: number };
   avgReplyMinutes: number | null;
   avgResolutionMinutes: number | null;
-  byAgent: ZendeskGroupedStat[];
+  byAgent: ZendeskAgentStat[];
   byGroup: ZendeskGroupedStat[];
   recent: {
     id: number;
@@ -1058,7 +1062,12 @@ export async function getZendeskSummary(
   const resolutionTimes: number[] = [];
   const agentMap = new Map<
     string,
-    { count: number; replyTimes: number[]; resolutionTimes: number[] }
+    {
+      count: number;
+      replyTimes: number[];
+      resolutionTimes: number[];
+      byRequestType: Map<string, number>;
+    }
   >();
   const groupMap = new Map<
     string,
@@ -1084,10 +1093,19 @@ export async function getZendeskSummary(
     if (r.full_resolution_time_minutes != null) resolutionTimes.push(r.full_resolution_time_minutes);
 
     const agent = r.assignee_name || r.assignee_email || "Unassigned";
-    const agentEntry = agentMap.get(agent) ?? { count: 0, replyTimes: [], resolutionTimes: [] };
+    const agentEntry =
+      agentMap.get(agent) ?? { count: 0, replyTimes: [], resolutionTimes: [], byRequestType: new Map<string, number>() };
     agentEntry.count += 1;
     if (r.reply_time_minutes != null) agentEntry.replyTimes.push(r.reply_time_minutes);
-    if (r.full_resolution_time_minutes != null) agentEntry.resolutionTimes.push(r.full_resolution_time_minutes);
+    if (r.full_resolution_time_minutes != null) {
+      agentEntry.resolutionTimes.push(r.full_resolution_time_minutes);
+      if (r.request_type) {
+        agentEntry.byRequestType.set(
+          r.request_type,
+          (agentEntry.byRequestType.get(r.request_type) ?? 0) + r.full_resolution_time_minutes
+        );
+      }
+    }
     agentMap.set(agent, agentEntry);
 
     const group = r.group_name || "Ungrouped";
@@ -1119,6 +1137,9 @@ export async function getZendeskSummary(
         count: e.count,
         avgReplyMinutes: average(e.replyTimes),
         avgResolutionMinutes: average(e.resolutionTimes),
+        byRequestType: [...e.byRequestType.entries()]
+          .map(([requestType, totalResolutionMinutes]) => ({ requestType, totalResolutionMinutes }))
+          .sort((a, b) => b.totalResolutionMinutes - a.totalResolutionMinutes),
       }))
       .sort((a, b) => b.count - a.count),
     byGroup: [...groupMap.entries()]
