@@ -2,7 +2,6 @@ import { supabaseServer } from "./supabase-server";
 import { errorMessage } from "./error-message";
 
 const CURSOR_KEY = "zendesk_tickets_cursor";
-const METRICS_CURSOR_KEY = "zendesk_metrics_cursor";
 const MAX_PAGES_PER_RUN = 10; // ~10 req/min rate limit on this endpoint
 
 function zdCredentials() {
@@ -100,101 +99,59 @@ async function setCursor(endTime: number) {
   if (error) throw error;
 }
 
-type ZendeskTicketMetric = {
-  ticket_id: number;
-  reply_time_in_minutes?: { calendar?: number | null } | null;
-  full_resolution_time_in_minutes?: { calendar?: number | null } | null;
+type TicketMetricResponse = {
+  ticket_metric?: {
+    reply_time_in_minutes?: { calendar?: number | null } | null;
+    full_resolution_time_in_minutes?: { calendar?: number | null } | null;
+  };
 };
 
-type TicketMetricsResponse = {
-  ticket_metrics?: ZendeskTicketMetric[];
-  meta?: { has_more?: boolean };
-  links?: { next?: string | null };
-};
-
-async function getMetricsCursor(baseUrl: string): Promise<string> {
-  const supabase = supabaseServer();
-  const { data, error } = await supabase
-    .from("sync_state")
-    .select("value")
-    .eq("key", METRICS_CURSOR_KEY)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.value || baseUrl;
-}
-
-async function setMetricsCursor(url: string) {
-  const supabase = supabaseServer();
-  const { error } = await supabase.from("sync_state").upsert(
-    { key: METRICS_CURSOR_KEY, value: url, updated_at: new Date().toISOString() },
-    { onConflict: "key" }
-  );
-  if (error) throw error;
-}
+const MAX_TICKETS_PER_RUN = 50;
 
 // Reply/resolution time isn't on the plain ticket object — it's a separate
-// bulk endpoint, joined back onto already-synced tickets by id. Only
-// updates rows that already exist (never inserts), so it can't create a
-// partial ticket row.
+// per-ticket endpoint, joined back onto already-synced tickets by id.
 //
-// This endpoint has no "since" filter, only page-to-page cursor links —
-// unlike the incremental ticket export above, it always starts at the
-// account's *oldest* ticket unless a persisted cursor resumes it. Without
-// that, every run re-scanned the same oldest ~1000 tickets (going back to
-// account creation), which predate anything actually synced into
-// zendesk_tickets — so the id filter matched nothing, every run, forever.
-// Confirmed live: 0 of 5,533 synced tickets had ever gotten a
-// reply/resolution time before this fix. Persisting `links.next` in
-// sync_state (same pattern as the ticket cursor above) makes each run
-// continue where the last left off — a few runs to walk through the
-// historical backlog, then it naturally settles into picking up newly
-// completed tickets at the tail as they appear.
+// Previously used the bulk /ticket_metrics list endpoint with a persisted
+// page cursor, on the assumption that re-fetching the last page's "next"
+// link would surface newly-completed tickets appended after it. Confirmed
+// live that assumption was wrong: the cursor sat completely unchanged for
+// 5 days straight (zero new rows, zero errors) — retrying that dead-end
+// URL doesn't actually reveal new items the way cursor pagination normally
+// does. Switched to querying per-ticket instead: pick the N most-recently-
+// created tickets still missing a reply time and hit each one's own
+// /tickets/{id}/metrics endpoint directly. No cursor, no pagination edge
+// cases, and it always prioritizes the tickets the dashboard actually
+// shows (recent ones) over ancient history nobody's looking at.
 async function syncZendeskTicketMetrics(): Promise<{ metrics: number }> {
   const { subdomain } = zdCredentials();
   const supabase = supabaseServer();
 
-  const { data: existing, error: existingErr } = await supabase
+  const { data: missing, error: missingErr } = await supabase
     .from("zendesk_tickets")
-    .select("id");
-  if (existingErr) throw existingErr;
-  const existingIds = new Set((existing ?? []).map((r) => r.id));
-  if (existingIds.size === 0) return { metrics: 0 };
+    .select("id")
+    .is("reply_time_minutes", null)
+    .order("created_at", { ascending: false })
+    .limit(MAX_TICKETS_PER_RUN);
+  if (missingErr) throw missingErr;
+  if (!missing?.length) return { metrics: 0 };
 
-  const baseUrl = `https://${subdomain}.zendesk.com/api/v2/ticket_metrics?page[size]=100`;
-  let url = await getMetricsCursor(baseUrl);
   let total = 0;
+  for (const { id } of missing) {
+    const data: TicketMetricResponse = await zdFetch(
+      `https://${subdomain}.zendesk.com/api/v2/tickets/${id}/metrics`
+    );
+    const m = data.ticket_metric;
+    if (!m) continue;
 
-  for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
-    const data: TicketMetricsResponse = await zdFetch(url);
-    const metrics = data.ticket_metrics ?? [];
-
-    const payload = metrics
-      .filter((m) => existingIds.has(m.ticket_id))
-      .map((m) => ({
-        id: m.ticket_id,
+    const { error } = await supabase
+      .from("zendesk_tickets")
+      .update({
         reply_time_minutes: m.reply_time_in_minutes?.calendar ?? null,
         full_resolution_time_minutes: m.full_resolution_time_in_minutes?.calendar ?? null,
-      }));
-
-    if (payload.length > 0) {
-      const { error } = await supabase.from("zendesk_tickets").upsert(payload, { onConflict: "id" });
-      if (error) throw error;
-      total += payload.length;
-    }
-
-    // Persist progress every page (not just at the end) so a mid-run
-    // failure doesn't lose ground already covered.
-    if (data.links?.next) {
-      url = data.links.next;
-      await setMetricsCursor(url);
-    } else {
-      // No next link — reached the tail. Keep the current cursor rather
-      // than resetting to baseUrl, so next run retries this same spot
-      // (which picks up newly-completed tickets appended since).
-      break;
-    }
-
-    if (!data.meta?.has_more) break;
+      })
+      .eq("id", id);
+    if (error) throw error;
+    total += 1;
   }
 
   return { metrics: total };
