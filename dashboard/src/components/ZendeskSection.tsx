@@ -66,12 +66,14 @@ export function ZendeskSection({
             ).toLocaleString()}
           />
         </div>
-        <div className="rounded-3xl border-l-4 border-amber-500 bg-white p-6 shadow-sm">
-          <Metric
-            label="CSAT (Good)"
-            value={csatTotal > 0 ? `${Math.round((summary.csat.good / csatTotal) * 100)}%` : "—"}
-          />
-        </div>
+        {csatTotal > 0 && (
+          <div className="rounded-3xl border-l-4 border-amber-500 bg-white p-6 shadow-sm">
+            <Metric
+              label="CSAT (Good)"
+              value={`${Math.round((summary.csat.good / csatTotal) * 100)}%`}
+            />
+          </div>
+        )}
         <div className="rounded-3xl border-l-4 border-teal-500 bg-white p-6 shadow-sm">
           <Metric label="Avg First Response" value={formatDuration(summary.avgReplyMinutes)} />
         </div>
