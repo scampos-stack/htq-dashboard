@@ -80,6 +80,15 @@ export function JustCallSection({ summary }: { summary: JustCallSummary }) {
         </div>
       </div>
 
+      {summary.botDialsExcluded > 0 && (
+        <p className="mb-6 text-xs text-body-gray">
+          {summary.botDialsExcluded.toLocaleString()} bot dial
+          {summary.botDialsExcluded === 1 ? "" : "s"} excluded from every number
+          on this page — abandoned IVR hangups and failed/unanswered outbound
+          attempts, not real customer interactions.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <DonutChart
           title="Calls by Direction"

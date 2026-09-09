@@ -1176,6 +1176,7 @@ export type JustCallSummary = {
   topTopics: { topic: string; count: number }[];
   avgCallScore: number | null;
   sentimentBreakdown: { sentiment: string; count: number }[];
+  botDialsExcluded: number;
   recent: {
     id: number;
     contactNumber: string | null;
@@ -1199,8 +1200,22 @@ const EMPTY_JUSTCALL_SUMMARY: JustCallSummary = {
   topTopics: [],
   avgCallScore: null,
   sentimentBreakdown: [],
+  botDialsExcluded: 0,
   recent: [],
 };
+
+// "Bot dials" (per Sarah's scoping) — not real customer interactions, so
+// excluded from every aggregate in this summary rather than counted as
+// real call volume: an abandoned inbound call means the caller hit the IVR
+// and hung up before reaching a menu or a human; a failed/unanswered
+// outbound call is just our own dialer never connecting, not a customer
+// action at all. Deliberately narrow — a "missed" inbound call (rang, no
+// one answered) IS a real customer signal and stays counted.
+function isBotDial(row: { direction: string | null; call_type: string | null }): boolean {
+  if (row.direction === "Incoming" && row.call_type === "abandoned") return true;
+  if (row.direction === "Outgoing" && (row.call_type === "failed" || row.call_type === "unanswered")) return true;
+  return false;
+}
 
 export async function getJustCallSummary(range?: ZendeskDateRange): Promise<JustCallSummary> {
   const supabase = supabaseServer();
@@ -1248,7 +1263,9 @@ export async function getJustCallSummary(range?: ZendeskDateRange): Promise<Just
     }));
   }
 
-  const rows = data ?? [];
+  const allRows = data ?? [];
+  const rows = allRows.filter((r) => !isBotDial(r));
+  const botDialsExcluded = allRows.length - rows.length;
   const directionMap = new Map<string, number>();
   const typeMap = new Map<string, number>();
   const dispositionMap = new Map<string, number>();
@@ -1327,6 +1344,7 @@ export async function getJustCallSummary(range?: ZendeskDateRange): Promise<Just
     sentimentBreakdown: [...sentimentMap.entries()]
       .map(([sentiment, count]) => ({ sentiment, count }))
       .sort((a, b) => b.count - a.count),
+    botDialsExcluded,
     recent: rows.slice(0, 25).map((r) => ({
       id: r.id,
       contactNumber: r.contact_number,
