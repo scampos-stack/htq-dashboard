@@ -23,6 +23,7 @@ import {
   getWoodpeckerSentiment,
   getMicrosoftLinkBookedCallsCount,
   getChannelBlendAppointmentsCount,
+  getBookedCallsByCarrier,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
 import { ArrangementTabs } from "@/components/ArrangementTabs";
@@ -703,6 +704,7 @@ export default async function Home({
     volumeTrend,
     microsoftLinkBookedCalls,
     channelBlendAppointmentsCount,
+    bookedCallsByCarrier,
   ] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
@@ -731,6 +733,7 @@ export default async function Home({
     getDailyVolumeTrend(rangeParam === "all" ? 30 : Number(rangeParam)),
     getMicrosoftLinkBookedCallsCount(rangeParam === "all" ? undefined : Number(rangeParam)),
     getChannelBlendAppointmentsCount(rangeParam === "all" ? undefined : Number(rangeParam)),
+    getBookedCallsByCarrier(rangeParam === "all" ? undefined : Number(rangeParam)),
   ]);
 
   const wpStatusOptions = [...new Set(allCampaigns.map((c) => c.status).filter(Boolean))] as string[];
@@ -794,16 +797,30 @@ export default async function Home({
                   ];
                   const totalBookedCalls = bookedCallsBySource.reduce((sum, r) => sum + r.count, 0);
                   return (
-                    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
                       <div className="flex flex-col justify-center rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
                         <Metric label="Total Booked Calls" value={totalBookedCalls.toLocaleString()} />
                         <p className="mt-2 text-xs text-body-gray">
                           15-minute HTQ Discovery calls booked in {rangeLabel}, across both sources.
                         </p>
+                        {bookedCallsByCarrier.length > 0 && (
+                          <p className="mt-3 text-xs text-body-gray">
+                            Top carrier:{" "}
+                            <span className="font-semibold text-charcoal">
+                              {bookedCallsByCarrier[0].carrier}
+                            </span>{" "}
+                            ({bookedCallsByCarrier[0].count.toLocaleString()})
+                          </p>
+                        )}
                       </div>
                       <DonutChart
                         title="Booked Calls by Source"
                         segments={bookedCallsBySource.map((r) => ({ label: r.label, value: r.count }))}
+                      />
+                      <HorizontalBarList
+                        title="Booked Calls by Carrier"
+                        accent="bg-violet-500"
+                        rows={bookedCallsByCarrier.map((r) => ({ label: r.carrier, count: r.count }))}
                       />
                     </div>
                   );

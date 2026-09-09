@@ -138,6 +138,48 @@ export async function getChannelBlendAppointmentsCount(days?: number): Promise<n
   return count ?? 0;
 }
 
+// Same two sources as getMicrosoftLinkBookedCallsCount /
+// getChannelBlendAppointmentsCount, but broken out by carrier — derived from
+// the contact's email domain (see carrierFromEmail) since neither source
+// records carrier directly on a booked call.
+export async function getBookedCallsByCarrier(
+  days?: number
+): Promise<{ carrier: string; count: number }[]> {
+  const supabase = supabaseServer();
+  const since = days != null ? new Date() : null;
+  if (since) since.setDate(since.getDate() - days!);
+
+  const byCarrier = new Map<string, number>();
+  const bump = (carrier: string | null) => {
+    const key = carrier ?? "Unknown";
+    byCarrier.set(key, (byCarrier.get(key) ?? 0) + 1);
+  };
+
+  let microsoftQuery = supabase.from("booked_calls").select("contact_email, created_at");
+  if (since) microsoftQuery = microsoftQuery.gte("created_at", since.toISOString());
+  const { data: microsoftRows, error: microsoftErr } = await microsoftQuery;
+  if (microsoftErr) {
+    console.error("[data] booked_calls carrier breakdown failed (migration 021 pending?):", microsoftErr.message);
+  } else {
+    for (const r of microsoftRows ?? []) bump(carrierFromEmail(r.contact_email));
+  }
+
+  let channelBlendQuery = supabase
+    .from("channel_blend_dispositions")
+    .select("email_on_file, preferred_email, created_at")
+    .eq("category", "Appointments");
+  if (since) channelBlendQuery = channelBlendQuery.gte("created_at", since.toISOString());
+  const { data: channelBlendRows, error: channelBlendErr } = await channelBlendQuery;
+  if (channelBlendErr) throw channelBlendErr;
+  for (const r of channelBlendRows ?? []) {
+    bump(carrierFromEmail(r.email_on_file) ?? carrierFromEmail(r.preferred_email));
+  }
+
+  return [...byCarrier.entries()]
+    .map(([carrier, count]) => ({ carrier, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 // Booked calls today come from exactly two places: Channel Blend's own
 // "Appointments" upload category (see getChannelBlendAppointmentsCount), and
 // this table, fed by the Make.com scenario that watches Paula's Microsoft
