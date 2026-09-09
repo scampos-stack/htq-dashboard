@@ -118,6 +118,24 @@ export async function getChannelBlendSummary(): Promise<ChannelBlendSummary> {
   };
 }
 
+// Booked calls today come from exactly two places: Channel Blend's own
+// "Appointments" upload category (see getChannelBlendSummary), and this
+// table, fed by the Make.com scenario that watches Paula's Microsoft 365
+// calendar for the 15-minute HTQ Discovery link. Returns 0 rather than
+// throwing if migration 021 hasn't run yet — this is additive display
+// data, not worth crashing the whole dashboard's Promise.all over.
+export async function getMicrosoftLinkBookedCallsCount(): Promise<number> {
+  const supabase = supabaseServer();
+  const { count, error } = await supabase
+    .from("booked_calls")
+    .select("*", { count: "exact", head: true });
+  if (error) {
+    console.error("[data] booked_calls count failed (migration 021 pending?):", error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 export type ChannelBlendCategoryPattern = {
   category: string;
   summary: string;

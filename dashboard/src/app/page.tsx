@@ -21,6 +21,7 @@ import {
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
+  getMicrosoftLinkBookedCallsCount,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
 import { ArrangementTabs } from "@/components/ArrangementTabs";
@@ -699,6 +700,7 @@ export default async function Home({
     woodpeckerSentiment,
     rangeTotals,
     volumeTrend,
+    microsoftLinkBookedCalls,
   ] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
@@ -725,6 +727,7 @@ export default async function Home({
     getWoodpeckerSentiment(),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
     getDailyVolumeTrend(rangeParam === "all" ? 30 : Number(rangeParam)),
+    getMicrosoftLinkBookedCallsCount(),
   ]);
 
   const wpStatusOptions = [...new Set(allCampaigns.map((c) => c.status).filter(Boolean))] as string[];
@@ -772,6 +775,27 @@ export default async function Home({
                       <p className="mt-2 text-xs text-body-gray">
                         {connectedSources.map((r) => `${r.label.split(" (")[0]}: ${r.sent.toLocaleString()}`).join(" · ")}
                       </p>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const bookedCallsBySource = [
+                    { label: "Channel Blend", count: channelBlendSummary.appointmentsBooked },
+                    { label: "Microsoft Link", count: microsoftLinkBookedCalls },
+                  ];
+                  const totalBookedCalls = bookedCallsBySource.reduce((sum, r) => sum + r.count, 0);
+                  return (
+                    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div className="flex flex-col justify-center rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
+                        <Metric label="Total Booked Calls" value={totalBookedCalls.toLocaleString()} />
+                        <p className="mt-2 text-xs text-body-gray">
+                          15-minute HTQ Discovery calls booked, across both sources.
+                        </p>
+                      </div>
+                      <DonutChart
+                        title="Booked Calls by Source"
+                        segments={bookedCallsBySource.map((r) => ({ label: r.label, value: r.count }))}
+                      />
                     </div>
                   );
                 })()}
