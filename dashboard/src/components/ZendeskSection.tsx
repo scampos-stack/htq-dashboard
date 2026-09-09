@@ -53,7 +53,7 @@ export function ZendeskSection({
     <div>
       <ZendeskTopicsCard summary={topicsSummary} />
 
-      <div className="mb-6 grid grid-cols-1 gap-5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+      <div className="mb-6 grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <div className="rounded-3xl border-l-4 border-teal-500 bg-white p-6 shadow-sm">
           <Metric label="Total Tickets" value={summary.totalRows.toLocaleString()} />
         </div>

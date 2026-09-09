@@ -56,7 +56,7 @@ export function JustCallSection({ summary }: { summary: JustCallSummary }) {
 
   const overviewTab = (
     <div>
-      <div className="mb-6 grid grid-cols-1 gap-5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+      <div className="mb-6 grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <div className="rounded-3xl border-l-4 border-sky-500 bg-white p-6 shadow-sm">
           <Metric label="Total Calls" value={summary.totalCalls.toLocaleString()} />
         </div>
@@ -101,7 +101,12 @@ export function JustCallSection({ summary }: { summary: JustCallSummary }) {
             segments={summary.sentimentBreakdown.map((s) => ({
               label: s.sentiment,
               value: s.count,
-              color: s.sentiment === "Positive" ? "#7cb342" : s.sentiment === "Negative" ? "#d03b3b" : undefined,
+              color:
+                s.sentiment === "Positive"
+                  ? "#7cb342"
+                  : s.sentiment === "Negative"
+                    ? "#d03b3b"
+                    : "#898781",
             }))}
           />
         )}
