@@ -79,40 +79,6 @@ export function ZendeskSection({
           <Metric label="Avg Resolution Time" value={formatDuration(summary.avgResolutionMinutes)} />
         </div>
       </div>
-
-      <div className="rounded-3xl bg-white p-6 shadow-sm">
-        <h3 className="mb-4 font-heading text-base font-semibold text-charcoal">
-          Recent Tickets
-        </h3>
-        <div className="max-h-72 overflow-y-auto overflow-x-auto">
-        <table className="w-full min-w-[560px] border-collapse text-sm">
-          <thead className="sticky top-0 bg-white">
-            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-              <th className="py-2 pr-4">Subject</th>
-              <th className="py-2 pr-4">Requester</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2 pr-4">Priority</th>
-              <th className="py-2 pr-4">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {summary.recent.map((t) => (
-              <tr key={t.id} className="border-b border-black/5">
-                <td className="py-3 pr-4 max-w-xs truncate font-semibold text-charcoal" title={t.subject ?? ""}>
-                  {t.subject ?? "—"}
-                </td>
-                <td className="py-3 pr-4">{t.requesterEmail ?? "—"}</td>
-                <td className="py-3 pr-4">{t.status ?? "—"}</td>
-                <td className="py-3 pr-4">{t.priority ?? "—"}</td>
-                <td className="py-3 pr-4 text-body-gray">
-                  {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      </div>
     </div>
   );
 
