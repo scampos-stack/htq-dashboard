@@ -8,7 +8,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const { campaignName, dateSent, emailsDelivered, opens, clicks, replies, carrier } = body;
+    const { campaignName, dateSent, emailsDelivered, opens, clicks, replies, carrier, category } = body;
 
     if (!campaignName || typeof campaignName !== "string" || !campaignName.trim()) {
       return NextResponse.json(
@@ -43,6 +43,7 @@ export async function PATCH(
         clicks: Number(clicks),
         replies: Number(replies),
         carrier: carrier || "General",
+        category: category === "general" ? "general" : "sales_marketing",
       })
       .eq("id", id);
     if (error) throw error;

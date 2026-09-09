@@ -260,14 +260,24 @@ export type KeapBroadcast = {
   clicks: number;
   replies: number;
   carrier: string;
+  category: string;
 };
 
 export async function getKeapBroadcasts(): Promise<KeapBroadcast[]> {
   const supabase = supabaseServer();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("keap_broadcasts")
-    .select("id, campaign_name, date_sent, emails_delivered, opens, clicks, replies, carrier")
+    .select("id, campaign_name, date_sent, emails_delivered, opens, clicks, replies, carrier, category")
     .order("date_sent", { ascending: false });
+  if (error) {
+    // Migration 020 (category column) may not have run yet.
+    const fallback = await supabase
+      .from("keap_broadcasts")
+      .select("id, campaign_name, date_sent, emails_delivered, opens, clicks, replies, carrier")
+      .order("date_sent", { ascending: false });
+    data = fallback.data?.map((r) => ({ ...r, category: null })) ?? null;
+    error = fallback.error;
+  }
   if (error) throw error;
 
   return (data ?? []).map((r) => ({
@@ -279,6 +289,7 @@ export async function getKeapBroadcasts(): Promise<KeapBroadcast[]> {
     clicks: r.clicks,
     replies: r.replies,
     carrier: r.carrier ?? "General",
+    category: r.category ?? "sales_marketing",
   }));
 }
 
@@ -531,11 +542,19 @@ export async function getCarrierSummary(): Promise<CarrierSummaryRow[]> {
     byCarrier.set(carrier, row);
   }
 
-  const { data: broadcasts, error: broadcastsErr } = await supabase
+  let { data: broadcasts, error: broadcastsErr } = await supabase
     .from("keap_broadcasts")
-    .select("carrier, emails_delivered, opens, clicks");
+    .select("carrier, emails_delivered, opens, clicks, category");
+  if (broadcastsErr) {
+    // Migration 020 (category column) may not have run yet.
+    ({ data: broadcasts, error: broadcastsErr } = await supabase
+      .from("keap_broadcasts")
+      .select("carrier, emails_delivered, opens, clicks"));
+  }
   if (broadcastsErr) throw broadcastsErr;
-  for (const b of broadcasts ?? []) {
+  // "General"-categorized broadcasts (account notices, social, etc.) aren't
+  // sales/marketing pushes and shouldn't inflate carrier sales metrics.
+  for (const b of (broadcasts ?? []).filter((b) => ("category" in b ? b.category : null) !== "general")) {
     const carrier = b.carrier ?? "General";
     const row = byCarrier.get(carrier) ?? {
       carrier,
@@ -626,9 +645,15 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
     clicked: keapEmailsSnapshot?.clicked ?? 0,
   };
 
-  const { data: broadcasts, error: broadcastsErr } = await supabase
+  let { data: broadcasts, error: broadcastsErr } = await supabase
     .from("keap_broadcasts")
-    .select("emails_delivered, opens, clicks");
+    .select("emails_delivered, opens, clicks, category");
+  if (broadcastsErr) {
+    // Migration 020 (category column) may not have run yet.
+    ({ data: broadcasts, error: broadcastsErr } = await supabase
+      .from("keap_broadcasts")
+      .select("emails_delivered, opens, clicks"));
+  }
   if (broadcastsErr) throw broadcastsErr;
   const keapBroadcasts: SourceSummaryRow = {
     key: "keap_broadcasts",
@@ -639,7 +664,9 @@ export async function getSourceSummary(): Promise<SourceSummaryRow[]> {
     opened: 0,
     clicked: 0,
   };
-  for (const b of broadcasts ?? []) {
+  // "General"-categorized broadcasts aren't sales/marketing pushes and
+  // shouldn't inflate this rollup.
+  for (const b of (broadcasts ?? []).filter((b) => ("category" in b ? b.category : null) !== "general")) {
     keapBroadcasts.sent += b.emails_delivered;
     keapBroadcasts.delivered += b.emails_delivered;
     keapBroadcasts.opened += b.opens;

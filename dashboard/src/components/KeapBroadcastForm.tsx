@@ -16,6 +16,14 @@ const CARRIERS = [
   "Blend (Multi-Carrier)",
 ];
 
+// Distinct from carrier: whether the broadcast is a sales/marketing push
+// (counts toward carrier/source sales metrics) or a general notice — account
+// updates, social, etc. — that shouldn't inflate those numbers.
+const CATEGORIES = [
+  { value: "sales_marketing", label: "Sales / Marketing" },
+  { value: "general", label: "General" },
+];
+
 export type BroadcastFormValues = {
   campaignName: string;
   dateSent: string;
@@ -24,6 +32,7 @@ export type BroadcastFormValues = {
   clicks: string;
   replies: string;
   carrier: string;
+  category: string;
 };
 
 const EMPTY: BroadcastFormValues = {
@@ -34,6 +43,7 @@ const EMPTY: BroadcastFormValues = {
   clicks: "",
   replies: "",
   carrier: "General",
+  category: "sales_marketing",
 };
 
 export function KeapBroadcastForm({
@@ -142,6 +152,20 @@ export function KeapBroadcastForm({
             {CARRIERS.map((c) => (
               <option key={c} value={c}>
                 {c}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs font-semibold text-body-gray">
+          Category
+          <select
+            value={form.category}
+            onChange={(e) => set("category", e.target.value)}
+            className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
               </option>
             ))}
           </select>

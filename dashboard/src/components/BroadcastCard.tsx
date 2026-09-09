@@ -14,6 +14,12 @@ export type BroadcastCardData = {
   clicks: number;
   replies: number;
   carrier: string;
+  category: string;
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  sales_marketing: "Sales / Marketing",
+  general: "General",
 };
 
 function pct(numerator: number, denominator: number): string {
@@ -62,6 +68,7 @@ export function BroadcastCard({ broadcast }: { broadcast: BroadcastCardData }) {
             clicks: String(broadcast.clicks),
             replies: String(broadcast.replies),
             carrier: broadcast.carrier,
+            category: broadcast.category,
           }}
           onDone={() => setEditing(false)}
           onCancel={() => setEditing(false)}
@@ -77,7 +84,14 @@ export function BroadcastCard({ broadcast }: { broadcast: BroadcastCardData }) {
           <h3 className="font-heading text-lg font-semibold text-charcoal">
             {broadcast.campaignName}
           </h3>
-          <span className="text-xs text-body-gray">{broadcast.carrier}</span>
+          <span className="text-xs text-body-gray">
+            {broadcast.carrier}
+            {broadcast.category === "general" && (
+              <span className="ml-2 rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-body-gray">
+                General
+              </span>
+            )}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-body-gray">
