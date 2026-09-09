@@ -7,6 +7,20 @@ import { supabaseServer } from "@/lib/supabase-server";
 // point the Make scenario's HTTP module at:
 // https://<your-domain>/api/webhooks/booked-call?secret=<value>
 
+// Paula's team added a custom Bookings question ("How are you booking?" —
+// Self-Booked / Call-In) whose answer lands in the calendar event's raw
+// HTML body under a "Custom Fields" section, e.g. "Answer- Call-In" or
+// "Answer - Call-In" — confirmed live the dash spacing isn't consistent
+// between bookings, so it's tolerated here rather than assumed.
+function sourceFromEventBody(eventBody: unknown): string {
+  if (typeof eventBody !== "string") return "microsoft_link";
+  const match = eventBody.match(/How are you booking\?[\s\S]{0,80}?Answer\s*-\s*([^<\r\n]+)/i);
+  const answer = match?.[1]?.trim().toLowerCase();
+  if (!answer) return "microsoft_link";
+  if (answer.includes("call")) return "agent_call_in";
+  return "microsoft_link";
+}
+
 export async function POST(req: Request) {
   const url = new URL(req.url);
   const secret = url.searchParams.get("secret");
@@ -21,10 +35,11 @@ export async function POST(req: Request) {
     const contactEmail = body.contactEmail ?? body.email ?? null;
     const eventSubject = body.eventSubject ?? body.subject ?? null;
     const scheduledAt = body.scheduledAt ?? body.startDateTime ?? body.start ?? null;
-    // Only one source feeds this webhook today (the Microsoft 365 calendar
-    // scenario); accept an explicit source so a future second source
-    // (e.g. a different booking link) doesn't need a new endpoint.
-    const source = body.source || "microsoft_link";
+    // An explicit source (if ever sent) wins; otherwise derive it from the
+    // booking's "How are you booking?" custom-question answer, since every
+    // booking today comes through the same shared link regardless of how
+    // the person actually got there.
+    const source = body.source || sourceFromEventBody(body.eventBody);
 
     const supabase = supabaseServer();
     const { error } = await supabase.from("booked_calls").upsert(
