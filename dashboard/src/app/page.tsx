@@ -22,6 +22,7 @@ import {
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
   getMicrosoftLinkBookedCallsCount,
+  getChannelBlendAppointmentsCount,
 } from "@/lib/data";
 import { RangeSelect } from "@/components/RangeSelect";
 import { ArrangementTabs } from "@/components/ArrangementTabs";
@@ -701,6 +702,7 @@ export default async function Home({
     rangeTotals,
     volumeTrend,
     microsoftLinkBookedCalls,
+    channelBlendAppointmentsCount,
   ] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
@@ -727,7 +729,8 @@ export default async function Home({
     getWoodpeckerSentiment(),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
     getDailyVolumeTrend(rangeParam === "all" ? 30 : Number(rangeParam)),
-    getMicrosoftLinkBookedCallsCount(),
+    getMicrosoftLinkBookedCallsCount(rangeParam === "all" ? undefined : Number(rangeParam)),
+    getChannelBlendAppointmentsCount(rangeParam === "all" ? undefined : Number(rangeParam)),
   ]);
 
   const wpStatusOptions = [...new Set(allCampaigns.map((c) => c.status).filter(Boolean))] as string[];
@@ -778,9 +781,15 @@ export default async function Home({
                     </div>
                   );
                 })()}
+                <div className="mb-4 flex justify-end">
+                  <Suspense fallback={null}>
+                    <RangeSelect />
+                  </Suspense>
+                </div>
                 {(() => {
+                  const rangeLabel = rangeParam === "all" ? "all time" : `the last ${rangeParam} days`;
                   const bookedCallsBySource = [
-                    { label: "Channel Blend", count: channelBlendSummary.appointmentsBooked },
+                    { label: "Channel Blend", count: channelBlendAppointmentsCount },
                     { label: "Microsoft Link", count: microsoftLinkBookedCalls },
                   ];
                   const totalBookedCalls = bookedCallsBySource.reduce((sum, r) => sum + r.count, 0);
@@ -789,7 +798,7 @@ export default async function Home({
                       <div className="flex flex-col justify-center rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
                         <Metric label="Total Booked Calls" value={totalBookedCalls.toLocaleString()} />
                         <p className="mt-2 text-xs text-body-gray">
-                          15-minute HTQ Discovery calls booked, across both sources.
+                          15-minute HTQ Discovery calls booked in {rangeLabel}, across both sources.
                         </p>
                       </div>
                       <DonutChart
@@ -800,11 +809,6 @@ export default async function Home({
                   );
                 })()}
                 <AllSourcesDigestCard digest={allSourcesDigest} />
-                <div className="mb-4 flex justify-end">
-                  <Suspense fallback={null}>
-                    <RangeSelect />
-                  </Suspense>
-                </div>
                 <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <DonutChart
                     title="Source Mix (Sent)"
