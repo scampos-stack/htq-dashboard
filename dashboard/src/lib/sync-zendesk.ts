@@ -42,6 +42,7 @@ type ZendeskTicket = {
   created_at: string;
   updated_at: string;
   satisfaction_rating?: { score?: string; comment?: string | null } | null;
+  custom_fields?: { id: number; value: string | number | boolean | null }[];
 };
 
 type ZendeskUser = {
@@ -64,6 +65,34 @@ async function fetchGroups(): Promise<Map<number, string>> {
     `https://${subdomain}.zendesk.com/api/v2/groups.json`
   );
   return new Map((data.groups ?? []).map((g) => [g.id, g.name]));
+}
+
+type ZendeskTicketField = {
+  id: number;
+  title: string;
+  custom_field_options?: { name: string; value: string }[];
+};
+
+// "Request Type" is a custom dropdown field, not one of the standard ticket
+// properties — found by title match rather than a hardcoded id, since the
+// field's numeric id isn't known ahead of time and could differ per Zendesk
+// instance. A dropdown option's raw value on the ticket is a tag-like slug
+// (e.g. "billing_question"); custom_field_options gives the human label.
+async function fetchRequestTypeField(): Promise<{
+  fieldId: number | null;
+  labelByValue: Map<string, string>;
+}> {
+  const { subdomain } = zdCredentials();
+  const data: { ticket_fields?: ZendeskTicketField[] } = await zdFetch(
+    `https://${subdomain}.zendesk.com/api/v2/ticket_fields.json`
+  );
+  const field = (data.ticket_fields ?? []).find((f) => /request type/i.test(f.title));
+  if (!field) {
+    console.error('[sync] zendesk: no ticket field titled "Request Type" found — request_type will stay null');
+    return { fieldId: null, labelByValue: new Map() };
+  }
+  const labelByValue = new Map((field.custom_field_options ?? []).map((o) => [o.value, o.name]));
+  return { fieldId: field.id, labelByValue };
 }
 
 type IncrementalResponse = {
@@ -179,6 +208,12 @@ export async function syncZendesk(): Promise<{
     console.error("[sync] zendesk groups lookup failed:", err);
     return new Map<number, string>();
   });
+  const { fieldId: requestTypeFieldId, labelByValue: requestTypeLabels } = await fetchRequestTypeField().catch(
+    (err) => {
+      console.error("[sync] zendesk request type field lookup failed:", err);
+      return { fieldId: null, labelByValue: new Map<string, string>() };
+    }
+  );
 
   for (let page = 0; page < MAX_PAGES_PER_RUN; page++) {
     const data: IncrementalResponse = await zdFetch(url);
@@ -191,6 +226,14 @@ export async function syncZendesk(): Promise<{
       const payload = tickets.map((t) => {
         const requester = userById.get(t.requester_id);
         const assignee = t.assignee_id != null ? userById.get(t.assignee_id) : undefined;
+        const requestTypeRaw =
+          requestTypeFieldId != null
+            ? t.custom_fields?.find((f) => f.id === requestTypeFieldId)?.value
+            : null;
+        const requestType =
+          requestTypeRaw != null && requestTypeRaw !== ""
+            ? requestTypeLabels.get(String(requestTypeRaw)) ?? String(requestTypeRaw)
+            : null;
         return {
           id: t.id,
           subject: t.subject,
@@ -205,6 +248,7 @@ export async function syncZendesk(): Promise<{
           assignee_name: assignee?.name ?? null,
           group_id: t.group_id ?? null,
           group_name: t.group_id != null ? groupById.get(t.group_id) ?? null : null,
+          request_type: requestType,
           satisfaction_score: t.satisfaction_rating?.score ?? null,
           satisfaction_comment: t.satisfaction_rating?.comment ?? null,
           created_at: t.created_at,

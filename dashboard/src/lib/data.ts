@@ -945,6 +945,7 @@ export type ZendeskSummary = {
   totalRows: number;
   byStatus: { status: string; count: number }[];
   topTags: { tag: string; count: number }[];
+  byRequestType: { requestType: string; count: number }[];
   csat: { good: number; bad: number };
   avgReplyMinutes: number | null;
   avgResolutionMinutes: number | null;
@@ -997,7 +998,7 @@ export async function getZendeskSummary(
   let query = supabase
     .from("zendesk_tickets")
     .select(
-      "id, subject, status, priority, tags, requester_email, assignee_email, assignee_name, group_name, satisfaction_score, reply_time_minutes, full_resolution_time_minutes, created_at"
+      "id, subject, status, priority, tags, request_type, requester_email, assignee_email, assignee_name, group_name, satisfaction_score, reply_time_minutes, full_resolution_time_minutes, created_at"
     )
     .order("created_at", { ascending: false });
   if (range) {
@@ -1016,12 +1017,42 @@ export async function getZendeskSummary(
         ? query.is("assignee_name", null)
         : query.eq("assignee_name", assigneeName);
   }
-  const { data, error } = await query;
-  if (error) throw error;
+  let { data, error } = await query;
+  if (error) {
+    // request_type may not exist yet if migration 018 hasn't been run —
+    // this feeds the page's main Promise.all alongside everything else,
+    // so a missing column here shouldn't take down the whole dashboard.
+    // Retry once without it rather than throwing.
+    console.error("[getZendeskSummary] query failed (has migration 018 been run?), retrying without request_type:", error);
+    let fallbackQuery = supabase
+      .from("zendesk_tickets")
+      .select(
+        "id, subject, status, priority, tags, requester_email, assignee_email, assignee_name, group_name, satisfaction_score, reply_time_minutes, full_resolution_time_minutes, created_at"
+      )
+      .order("created_at", { ascending: false });
+    if (range) {
+      fallbackQuery = fallbackQuery.gte("created_at", range.since.toISOString());
+      if (range.until) fallbackQuery = fallbackQuery.lte("created_at", range.until.toISOString());
+    }
+    if (groupName) {
+      fallbackQuery =
+        groupName === "Ungrouped" ? fallbackQuery.is("group_name", null) : fallbackQuery.eq("group_name", groupName);
+    }
+    if (assigneeName) {
+      fallbackQuery =
+        assigneeName === "Unassigned"
+          ? fallbackQuery.is("assignee_name", null)
+          : fallbackQuery.eq("assignee_name", assigneeName);
+    }
+    const fallback = await fallbackQuery;
+    if (fallback.error) throw fallback.error;
+    data = fallback.data?.map((r) => ({ ...r, request_type: null as string | null })) ?? [];
+  }
 
   const rows = data ?? [];
   const byStatusMap = new Map<string, number>();
   const tagMap = new Map<string, number>();
+  const requestTypeMap = new Map<string, number>();
   const csat = { good: 0, bad: 0 };
   const replyTimes: number[] = [];
   const resolutionTimes: number[] = [];
@@ -1040,6 +1071,10 @@ export async function getZendeskSummary(
 
     for (const tag of r.tags ?? []) {
       tagMap.set(tag, (tagMap.get(tag) ?? 0) + 1);
+    }
+
+    if (r.request_type) {
+      requestTypeMap.set(r.request_type, (requestTypeMap.get(r.request_type) ?? 0) + 1);
     }
 
     if (r.satisfaction_score === "good") csat.good += 1;
@@ -1072,6 +1107,9 @@ export async function getZendeskSummary(
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10),
+    byRequestType: [...requestTypeMap.entries()]
+      .map(([requestType, count]) => ({ requestType, count }))
+      .sort((a, b) => b.count - a.count),
     csat,
     avgReplyMinutes: average(replyTimes),
     avgResolutionMinutes: average(resolutionTimes),

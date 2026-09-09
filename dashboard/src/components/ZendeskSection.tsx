@@ -95,11 +95,11 @@ export function ZendeskSection({
         title="Tickets by Status"
         segments={summary.byStatus.map((s) => ({ label: s.status, value: s.count }))}
       />
-      {summary.topTags.length > 0 && (
+      {summary.byRequestType.length > 0 && (
         <HorizontalBarList
-          title="Top Tags"
+          title="By Request Type"
           accent="bg-teal-500"
-          rows={summary.topTags.map((t) => ({ label: t.tag, count: t.count }))}
+          rows={summary.byRequestType.map((r) => ({ label: r.requestType, count: r.count }))}
         />
       )}
     </div>
