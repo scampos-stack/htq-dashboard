@@ -21,7 +21,7 @@ import {
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
-  getMicrosoftLinkBookedCallsCount,
+  getWebhookBookedCallsBySource,
   getChannelBlendAppointmentsCount,
   getBookedCallsByCarrier,
 } from "@/lib/data";
@@ -702,7 +702,7 @@ export default async function Home({
     woodpeckerSentiment,
     rangeTotals,
     volumeTrend,
-    microsoftLinkBookedCalls,
+    webhookBookedCallsBySource,
     channelBlendAppointmentsCount,
     bookedCallsByCarrier,
   ] = await Promise.all([
@@ -731,7 +731,7 @@ export default async function Home({
     getWoodpeckerSentiment(),
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
     getDailyVolumeTrend(rangeParam === "all" ? 30 : Number(rangeParam)),
-    getMicrosoftLinkBookedCallsCount(rangeParam === "all" ? undefined : Number(rangeParam)),
+    getWebhookBookedCallsBySource(rangeParam === "all" ? undefined : Number(rangeParam)),
     getChannelBlendAppointmentsCount(rangeParam === "all" ? undefined : Number(rangeParam)),
     getBookedCallsByCarrier(rangeParam === "all" ? undefined : Number(rangeParam)),
   ]);
@@ -791,9 +791,16 @@ export default async function Home({
                 </div>
                 {(() => {
                   const rangeLabel = rangeParam === "all" ? "all time" : `the last ${rangeParam} days`;
+                  const webhookSourceLabels: Record<string, string> = {
+                    microsoft_link: "Microsoft Link (self-booked)",
+                    agent_call_in: "Agent Call-In",
+                  };
                   const bookedCallsBySource = [
                     { label: "Channel Blend", count: channelBlendAppointmentsCount },
-                    { label: "Microsoft Link", count: microsoftLinkBookedCalls },
+                    ...webhookBookedCallsBySource.map((r) => ({
+                      label: webhookSourceLabels[r.source] ?? r.source,
+                      count: r.count,
+                    })),
                   ];
                   const totalBookedCalls = bookedCallsBySource.reduce((sum, r) => sum + r.count, 0);
                   return (

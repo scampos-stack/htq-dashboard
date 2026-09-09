@@ -180,28 +180,37 @@ export async function getBookedCallsByCarrier(
     .sort((a, b) => b.count - a.count);
 }
 
-// Booked calls today come from exactly two places: Channel Blend's own
-// "Appointments" upload category (see getChannelBlendAppointmentsCount), and
-// this table, fed by the Make.com scenario that watches Paula's Microsoft
-// 365 calendar for the 15-minute HTQ Discovery link. `days` filters to calls
-// booked (not scheduled to happen) in that window, matching the Overview
-// page's shared range selector — omit for all-time. Returns 0 rather than
-// throwing if migration 021 hasn't run yet — this is additive display
-// data, not worth crashing the whole dashboard's Promise.all over.
-export async function getMicrosoftLinkBookedCallsCount(days?: number): Promise<number> {
+// Booked calls today come from Channel Blend's own "Appointments" upload
+// category (see getChannelBlendAppointmentsCount), plus this table — fed by
+// the Make.com scenario that watches Paula's Microsoft 365 calendar for the
+// 15-minute HTQ Discovery link. Within that table, `source` splits further:
+// "microsoft_link" (self-booked) vs "agent_call_in" (booked by a rep after
+// a phone transfer), derived from a custom Bookings question — see
+// sourceFromEventBody in the webhook route. `days` filters to calls booked
+// (not scheduled to happen) in that window, matching the Overview page's
+// shared range selector — omit for all-time. Returns an empty breakdown
+// rather than throwing if migration 021 hasn't run yet — this is additive
+// display data, not worth crashing the whole dashboard's Promise.all over.
+export async function getWebhookBookedCallsBySource(
+  days?: number
+): Promise<{ source: string; count: number }[]> {
   const supabase = supabaseServer();
-  let query = supabase.from("booked_calls").select("*", { count: "exact", head: true });
+  let query = supabase.from("booked_calls").select("source");
   if (days != null) {
     const since = new Date();
     since.setDate(since.getDate() - days);
     query = query.gte("created_at", since.toISOString());
   }
-  const { count, error } = await query;
+  const { data, error } = await query;
   if (error) {
-    console.error("[data] booked_calls count failed (migration 021 pending?):", error.message);
-    return 0;
+    console.error("[data] booked_calls breakdown failed (migration 021 pending?):", error.message);
+    return [];
   }
-  return count ?? 0;
+  const bySource = new Map<string, number>();
+  for (const r of data ?? []) {
+    bySource.set(r.source, (bySource.get(r.source) ?? 0) + 1);
+  }
+  return [...bySource.entries()].map(([source, count]) => ({ source, count }));
 }
 
 export type ChannelBlendCategoryPattern = {
