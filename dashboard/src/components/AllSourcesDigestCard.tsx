@@ -144,28 +144,53 @@ export function AllSourcesDigestCard({ digest }: { digest: AllSourcesDigest }) {
                   </span>
                 )}
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                  {sections.map((s) => (
-                    <div key={s.heading}>
-                      <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-charcoal">
-                        <span
-                          className={`h-2 w-2 shrink-0 rounded-full ${
-                            SECTION_ACCENT[s.heading] || "bg-charcoal/20"
-                          }`}
-                        />
-                        {s.heading}
-                      </h4>
-                      <ul className="flex flex-col gap-1.5">
-                        {s.bullets.map((b, i) => (
-                          <li
-                            key={i}
-                            className="text-sm leading-snug text-charcoal"
-                          >
-                            {b}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+                  {sections.map((s) => {
+                    // Fewer than 3 sections have content this period (e.g. no
+                    // Cross-Referenced Insight yet) — rather than leave a
+                    // grid column empty, the longest section spreads its own
+                    // bullets across the freed-up columns instead.
+                    const colSpan =
+                      sections.length === 1 ? 3 : sections.length === 2 && s === sections[0] ? 2 : 1;
+                    const splitInto = colSpan === 3 ? Math.min(3, Math.ceil(s.bullets.length / 3)) : colSpan;
+                    const perColumn = Math.ceil(s.bullets.length / splitInto);
+                    const columns: string[][] = Array.from({ length: splitInto }, (_, i) =>
+                      s.bullets.slice(i * perColumn, (i + 1) * perColumn)
+                    );
+
+                    return (
+                      <div key={s.heading} className={colSpan === 2 ? "md:col-span-2" : colSpan === 3 ? "md:col-span-3" : undefined}>
+                        <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-charcoal">
+                          <span
+                            className={`h-2 w-2 shrink-0 rounded-full ${
+                              SECTION_ACCENT[s.heading] || "bg-charcoal/20"
+                            }`}
+                          />
+                          {s.heading}
+                        </h4>
+                        {splitInto > 1 ? (
+                          <div className={`grid grid-cols-1 gap-x-5 gap-y-1.5 ${splitInto === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+                            {columns.map((col, ci) => (
+                              <ul key={ci} className="flex flex-col gap-1.5">
+                                {col.map((b, i) => (
+                                  <li key={i} className="text-sm leading-snug text-charcoal">
+                                    {b}
+                                  </li>
+                                ))}
+                              </ul>
+                            ))}
+                          </div>
+                        ) : (
+                          <ul className="flex flex-col gap-1.5">
+                            {s.bullets.map((b, i) => (
+                              <li key={i} className="text-sm leading-snug text-charcoal">
+                                {b}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
