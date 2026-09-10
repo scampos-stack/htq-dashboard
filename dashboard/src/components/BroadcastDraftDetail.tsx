@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import type { BroadcastDraft, BroadcastDraftComment } from "@/lib/data";
 import { renderBroadcastDraftHtml } from "@/lib/broadcast-draft-template";
-import { BroadcastDraftStatusPill } from "@/components/BroadcastDraftStatusPill";
+import { BroadcastDraftStatusSelect } from "@/components/BroadcastDraftStatusSelect";
 import { BroadcastDraftForm, draftToFormValues } from "@/components/BroadcastDraftForm";
 
 type PendingSelection = { text: string; x: number; y: number };
@@ -150,7 +150,7 @@ export function BroadcastDraftDetail({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="font-heading text-2xl font-bold text-charcoal">{draft.campaignTheme}</h1>
-            <BroadcastDraftStatusPill status={draft.status} />
+            <BroadcastDraftStatusSelect draftId={draft.id} status={draft.status} />
           </div>
           <p className="mt-1 text-sm text-body-gray">
             {new Date(draft.targetDate + "T00:00:00").toLocaleDateString()} · {draft.listSegment}
