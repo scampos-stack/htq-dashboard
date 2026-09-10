@@ -448,12 +448,14 @@ function mapBroadcastDraftRow(r: any): BroadcastDraft {
   };
 }
 
-export async function getBroadcastDrafts(): Promise<BroadcastDraft[]> {
+export async function getBroadcastDrafts(status?: BroadcastDraftStatus): Promise<BroadcastDraft[]> {
   const supabase = supabaseServer();
-  const { data, error } = await supabase
+  let query = supabase
     .from("broadcast_drafts")
     .select(BROADCAST_DRAFT_COLUMNS)
     .order("target_date", { ascending: true });
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
   if (error) {
     console.error("[data] broadcast_drafts fetch failed (migration 022 pending?):", error.message);
     return [];
@@ -479,6 +481,7 @@ export type BroadcastDraftComment = {
   comment: string;
   selectedText: string | null;
   applied: boolean;
+  resolved: boolean;
   createdAt: string;
 };
 
@@ -486,18 +489,29 @@ export async function getBroadcastDraftComments(draftId: number): Promise<Broadc
   const supabase = supabaseServer();
   let { data, error } = await supabase
     .from("broadcast_draft_comments")
-    .select("id, draft_id, author, comment, selected_text, applied, created_at")
+    .select("id, draft_id, author, comment, selected_text, applied, resolved, created_at")
     .eq("draft_id", draftId)
     .order("created_at", { ascending: false });
   if (error) {
-    // Migration 023 (selected_text column) may not have run yet.
+    // Migration 024 (resolved column) may not have run yet.
     const fallback = await supabase
       .from("broadcast_draft_comments")
-      .select("id, draft_id, author, comment, applied, created_at")
+      .select("id, draft_id, author, comment, selected_text, applied, created_at")
       .eq("draft_id", draftId)
       .order("created_at", { ascending: false });
-    data = fallback.data?.map((r) => ({ ...r, selected_text: null })) ?? null;
-    error = fallback.error;
+    if (fallback.error) {
+      // Migration 023 (selected_text column) may not have run yet either.
+      const fallback2 = await supabase
+        .from("broadcast_draft_comments")
+        .select("id, draft_id, author, comment, applied, created_at")
+        .eq("draft_id", draftId)
+        .order("created_at", { ascending: false });
+      data = fallback2.data?.map((r) => ({ ...r, selected_text: null, resolved: false })) ?? null;
+      error = fallback2.error;
+    } else {
+      data = fallback.data?.map((r) => ({ ...r, resolved: false })) ?? null;
+      error = null;
+    }
   }
   if (error) throw error;
   return (data ?? []).map((r) => ({
@@ -507,6 +521,7 @@ export async function getBroadcastDraftComments(draftId: number): Promise<Broadc
     author: r.author,
     comment: r.comment,
     applied: r.applied,
+    resolved: r.resolved,
     createdAt: r.created_at,
   }));
 }

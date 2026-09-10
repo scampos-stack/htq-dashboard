@@ -23,6 +23,7 @@ export function BroadcastDraftDetail({
   const [newComment, setNewComment] = useState("");
   const [posting, setPosting] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Selecting a phrase in the preview shows a small "Comment on this"
   // button anchored to the selection; clicking it opens the comment box
@@ -117,6 +118,25 @@ export function BroadcastDraftDetail({
       setError(err instanceof Error ? err.message : "Failed to add comment");
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function handleToggleResolved(commentId: number, resolved: boolean) {
+    setResolvingId(commentId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/broadcast-drafts/${draft.id}/comments/${commentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolved }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to update comment");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update comment");
+    } finally {
+      setResolvingId(null);
     }
   }
 
@@ -249,33 +269,52 @@ export function BroadcastDraftDetail({
             <p className="text-sm text-body-gray">No feedback yet.</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {comments.map((c) => (
-                <div key={c.id} className="rounded-lg border border-black/5 bg-mist/60 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-charcoal">{c.author}</span>
-                    <span className="text-[10px] text-body-gray">{new Date(c.createdAt).toLocaleString()}</span>
-                  </div>
-                  {c.selectedText && (
-                    <p className="mt-1 rounded bg-amber-50 px-2 py-1 text-xs italic text-amber-800">
-                      &quot;{c.selectedText}&quot;
-                    </p>
-                  )}
-                  <p className="mt-1 text-sm text-charcoal">{c.comment}</p>
-                  <div className="mt-2">
-                    {c.applied ? (
-                      <span className="text-xs font-semibold text-brand-green-dark">✓ Applied</span>
-                    ) : (
-                      <button
-                        onClick={() => handleRegenerate(c.id)}
-                        disabled={regeneratingId === c.id}
-                        className="text-xs font-semibold text-sky-600 underline disabled:opacity-50"
-                      >
-                        {regeneratingId === c.id ? "Regenerating…" : "Regenerate from this"}
-                      </button>
+              {comments.map((c) => {
+                const done = c.applied || c.resolved;
+                return (
+                  <div
+                    key={c.id}
+                    className={`rounded-lg border border-black/5 p-3 ${done ? "bg-mist/30" : "bg-mist/60"}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs font-semibold ${done ? "text-body-gray" : "text-charcoal"}`}>
+                        {c.author}
+                      </span>
+                      <span className="text-[10px] text-body-gray">{new Date(c.createdAt).toLocaleString()}</span>
+                    </div>
+                    {c.selectedText && (
+                      <p className="mt-1 rounded bg-amber-50 px-2 py-1 text-xs italic text-amber-800">
+                        &quot;{c.selectedText}&quot;
+                      </p>
                     )}
+                    <p className={`mt-1 text-sm ${done ? "text-body-gray" : "text-charcoal"}`}>{c.comment}</p>
+                    <div className="mt-2 flex items-center gap-3">
+                      {c.applied ? (
+                        <span className="text-xs font-semibold text-brand-green-dark">✓ Applied by AI</span>
+                      ) : c.resolved ? (
+                        <span className="text-xs font-semibold text-brand-green-dark">✓ Resolved</span>
+                      ) : (
+                        <button
+                          onClick={() => handleRegenerate(c.id)}
+                          disabled={regeneratingId === c.id}
+                          className="text-xs font-semibold text-sky-600 underline disabled:opacity-50"
+                        >
+                          {regeneratingId === c.id ? "Regenerating…" : "Regenerate from this"}
+                        </button>
+                      )}
+                      {!c.applied && (
+                        <button
+                          onClick={() => handleToggleResolved(c.id, !c.resolved)}
+                          disabled={resolvingId === c.id}
+                          className="text-xs font-semibold text-body-gray underline disabled:opacity-50"
+                        >
+                          {resolvingId === c.id ? "Saving…" : c.resolved ? "Reopen" : "Mark Resolved"}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
