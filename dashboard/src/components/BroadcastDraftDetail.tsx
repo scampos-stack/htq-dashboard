@@ -1,11 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { BroadcastDraft, BroadcastDraftComment } from "@/lib/data";
 import { renderBroadcastDraftHtml } from "@/lib/broadcast-draft-template";
 import { BroadcastDraftStatusPill } from "@/components/BroadcastDraftStatusPill";
 import { BroadcastDraftForm, draftToFormValues } from "@/components/BroadcastDraftForm";
+
+type PendingSelection = { text: string; x: number; y: number };
 
 export function BroadcastDraftDetail({
   draft,
@@ -15,12 +17,19 @@ export function BroadcastDraftDetail({
   comments: BroadcastDraftComment[];
 }) {
   const router = useRouter();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [posting, setPosting] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Selecting a phrase in the preview shows a small "Comment on this"
+  // button anchored to the selection; clicking it opens the comment box
+  // pre-attached to that exact phrase so the AI regenerate step gets
+  // precise context instead of a vague comment alone.
+  const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
+  const [attachedSelection, setAttachedSelection] = useState<string | null>(null);
 
   const html = useMemo(
     () =>
@@ -47,6 +56,39 @@ export function BroadcastDraftDetail({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // The iframe reloads its document every time `html` changes (srcDoc), so
+  // the selection listener has to be re-attached on each load rather than
+  // once on mount.
+  function handleIframeLoad() {
+    const iframeDoc = iframeRef.current?.contentDocument;
+    const iframeWin = iframeRef.current?.contentWindow;
+    if (!iframeDoc || !iframeWin) return;
+
+    iframeDoc.addEventListener("mouseup", () => {
+      const selection = iframeWin.getSelection();
+      const text = selection?.toString().trim();
+      const iframeEl = iframeRef.current;
+      if (!text || !selection || selection.rangeCount === 0 || !iframeEl) {
+        setPendingSelection(null);
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const iframeRect = iframeEl.getBoundingClientRect();
+      setPendingSelection({
+        text,
+        x: iframeRect.left + rect.left + rect.width / 2,
+        y: iframeRect.top + rect.top,
+      });
+    });
+  }
+
+  function attachSelectionToComment() {
+    if (!pendingSelection) return;
+    setAttachedSelection(pendingSelection.text);
+    setPendingSelection(null);
+  }
+
   async function handleAddComment(e: React.FormEvent) {
     e.preventDefault();
     if (!newComment.trim()) return;
@@ -56,11 +98,12 @@ export function BroadcastDraftDetail({
       const res = await fetch(`/api/broadcast-drafts/${draft.id}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comment: newComment }),
+        body: JSON.stringify({ comment: newComment, selectedText: attachedSelection }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to add comment");
       setNewComment("");
+      setAttachedSelection(null);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add comment");
@@ -127,6 +170,16 @@ export function BroadcastDraftDetail({
 
       {error && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
+      {pendingSelection && (
+        <button
+          onClick={attachSelectionToComment}
+          style={{ position: "fixed", left: pendingSelection.x, top: pendingSelection.y, transform: "translate(-50%, -110%)" }}
+          className="z-50 whitespace-nowrap rounded-full bg-charcoal px-3 py-1.5 text-xs font-semibold text-white shadow-lg hover:bg-charcoal/80"
+        >
+          Comment on this
+        </button>
+      )}
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
         <div className="rounded-3xl bg-white p-6 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
@@ -143,9 +196,14 @@ export function BroadcastDraftDetail({
               <span className="font-semibold text-charcoal">Subject:</span> {draft.subject}
             </p>
           )}
+          <p className="mb-2 text-xs text-body-gray">
+            Tip: highlight any phrase below to leave feedback tied to that exact text.
+          </p>
           <iframe
+            ref={iframeRef}
             srcDoc={html}
             title="Email preview"
+            onLoad={handleIframeLoad}
             className="w-full rounded-lg border border-black/10"
             style={{ height: 800 }}
           />
@@ -154,6 +212,16 @@ export function BroadcastDraftDetail({
         <div className="rounded-3xl bg-white p-6 shadow-sm">
           <h3 className="mb-3 font-heading text-base font-semibold text-charcoal">Feedback</h3>
           <form onSubmit={handleAddComment} className="mb-4 flex flex-col gap-2">
+            {attachedSelection && (
+              <div className="flex items-start justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <span>
+                  On: <span className="italic">&quot;{attachedSelection}&quot;</span>
+                </span>
+                <button type="button" onClick={() => setAttachedSelection(null)} className="shrink-0 font-semibold underline">
+                  Remove
+                </button>
+              </div>
+            )}
             <textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -179,6 +247,11 @@ export function BroadcastDraftDetail({
                     <span className="text-xs font-semibold text-charcoal">{c.author}</span>
                     <span className="text-[10px] text-body-gray">{new Date(c.createdAt).toLocaleString()}</span>
                   </div>
+                  {c.selectedText && (
+                    <p className="mt-1 rounded bg-amber-50 px-2 py-1 text-xs italic text-amber-800">
+                      &quot;{c.selectedText}&quot;
+                    </p>
+                  )}
                   <p className="mt-1 text-sm text-charcoal">{c.comment}</p>
                   <div className="mt-2">
                     {c.applied ? (

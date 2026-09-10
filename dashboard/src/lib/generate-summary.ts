@@ -678,7 +678,8 @@ const DRAFT_FIELD_TO_COLUMN: Record<(typeof EDITABLE_DRAFT_FIELDS)[number], stri
 // (out of scope for v1 — the comment thread itself is the audit trail).
 export async function regenerateBroadcastDraftFromComment(
   draftId: number,
-  commentText: string
+  commentText: string,
+  selectedText?: string | null
 ): Promise<{ generated: boolean; reason?: string; changedFields?: string[] }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -707,6 +708,13 @@ export async function regenerateBroadcastDraftFromComment(
       "unless the comment explicitly asks to change tone/length. " +
       "\"introParagraphs\" is an array of paragraph strings — if editing it, " +
       "return the complete replacement array (not a diff).\n\n" +
+      (selectedText
+        ? "The human highlighted an exact phrase in the preview before " +
+          "commenting — treat that phrase as the precise anchor for the " +
+          "comment. Find which field currently contains that phrase (it " +
+          "may be inside one entry of introParagraphs, not necessarily the " +
+          "whole field) and edit only that field accordingly.\n\n"
+        : "") +
       "Respond with ONLY a raw JSON object (no markdown fences, no prose) " +
       "whose keys are a subset of: " + EDITABLE_DRAFT_FIELDS.join(", ") + ". " +
       "Include a key only if you are changing that field. If the comment " +
@@ -717,6 +725,7 @@ export async function regenerateBroadcastDraftFromComment(
         content:
           "Current draft content (JSON):\n\n" +
           JSON.stringify(draftContentForPrompt(draft), null, 2) +
+          (selectedText ? `\n\nHighlighted phrase: "${selectedText}"` : "") +
           `\n\nFeedback comment: "${commentText}"`,
       },
     ],

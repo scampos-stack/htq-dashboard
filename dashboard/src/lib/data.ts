@@ -477,21 +477,33 @@ export type BroadcastDraftComment = {
   draftId: number;
   author: string;
   comment: string;
+  selectedText: string | null;
   applied: boolean;
   createdAt: string;
 };
 
 export async function getBroadcastDraftComments(draftId: number): Promise<BroadcastDraftComment[]> {
   const supabase = supabaseServer();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("broadcast_draft_comments")
-    .select("id, draft_id, author, comment, applied, created_at")
+    .select("id, draft_id, author, comment, selected_text, applied, created_at")
     .eq("draft_id", draftId)
     .order("created_at", { ascending: false });
+  if (error) {
+    // Migration 023 (selected_text column) may not have run yet.
+    const fallback = await supabase
+      .from("broadcast_draft_comments")
+      .select("id, draft_id, author, comment, applied, created_at")
+      .eq("draft_id", draftId)
+      .order("created_at", { ascending: false });
+    data = fallback.data?.map((r) => ({ ...r, selected_text: null })) ?? null;
+    error = fallback.error;
+  }
   if (error) throw error;
   return (data ?? []).map((r) => ({
     id: r.id,
     draftId: r.draft_id,
+    selectedText: r.selected_text,
     author: r.author,
     comment: r.comment,
     applied: r.applied,

@@ -12,17 +12,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const supabase = supabaseServer();
-    const { data: comment, error: commentErr } = await supabase
+    let { data: comment, error: commentErr } = await supabase
       .from("broadcast_draft_comments")
-      .select("id, comment, draft_id")
+      .select("id, comment, selected_text, draft_id")
       .eq("id", commentId)
       .single();
+    if (commentErr) {
+      // Migration 023 (selected_text column) may not have run yet.
+      const fallback = await supabase
+        .from("broadcast_draft_comments")
+        .select("id, comment, draft_id")
+        .eq("id", commentId)
+        .single();
+      comment = fallback.data ? { ...fallback.data, selected_text: null } : null;
+      commentErr = fallback.error;
+    }
     if (commentErr) throw commentErr;
-    if (comment.draft_id !== Number(id)) {
+    if (!comment || comment.draft_id !== Number(id)) {
       return NextResponse.json({ ok: false, error: "Comment does not belong to this draft." }, { status: 400 });
     }
 
-    const result = await regenerateBroadcastDraftFromComment(Number(id), comment.comment);
+    const result = await regenerateBroadcastDraftFromComment(Number(id), comment.comment, comment.selected_text);
     if (!result.generated) {
       return NextResponse.json({ ok: false, error: result.reason ?? "Regenerate failed" }, { status: 422 });
     }
