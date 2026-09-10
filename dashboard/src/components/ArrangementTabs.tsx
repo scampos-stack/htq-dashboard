@@ -18,7 +18,7 @@ export function ArrangementTabs() {
   const current = searchParams.get("arrangement") ?? "overview";
 
   return (
-    <nav className="mb-8 flex flex-wrap gap-2">
+    <nav className="flex flex-wrap gap-2">
       {ARRANGEMENTS.map((a) => {
         const active = current === a.value;
         return (

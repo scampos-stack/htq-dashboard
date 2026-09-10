@@ -388,6 +388,117 @@ export async function getKeapBroadcasts(): Promise<KeapBroadcast[]> {
   }));
 }
 
+export type BroadcastDraftStatus = "not_started" | "writing" | "for_approval" | "approved" | "sent";
+
+export type BroadcastDraft = {
+  id: number;
+  campaignTheme: string;
+  targetDate: string;
+  listSegment: string;
+  focus: string | null;
+  utmCampaign: string | null;
+  audienceEstimate: number | null;
+  status: BroadcastDraftStatus;
+  version: number;
+  subject: string | null;
+  preheader: string | null;
+  introParagraphs: string[];
+  highlightHeading: string | null;
+  highlightBody: string | null;
+  ctaText: string | null;
+  ctaUrl: string | null;
+  closingParagraph: string | null;
+  signoffLine: string | null;
+  signoffSubtext: string | null;
+  footerNoteText: string | null;
+  footerNoteLinkText: string | null;
+  footerNoteLinkUrl: string | null;
+  updatedAt: string;
+};
+
+const BROADCAST_DRAFT_COLUMNS =
+  "id, campaign_theme, target_date, list_segment, focus, utm_campaign, audience_estimate, status, version, subject, preheader, intro_paragraphs, highlight_heading, highlight_body, cta_text, cta_url, closing_paragraph, signoff_line, signoff_subtext, footer_note_text, footer_note_link_text, footer_note_link_url, updated_at";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapBroadcastDraftRow(r: any): BroadcastDraft {
+  return {
+    id: r.id,
+    campaignTheme: r.campaign_theme,
+    targetDate: r.target_date,
+    listSegment: r.list_segment,
+    focus: r.focus,
+    utmCampaign: r.utm_campaign,
+    audienceEstimate: r.audience_estimate,
+    status: r.status,
+    version: r.version,
+    subject: r.subject,
+    preheader: r.preheader,
+    introParagraphs: r.intro_paragraphs ?? [],
+    highlightHeading: r.highlight_heading,
+    highlightBody: r.highlight_body,
+    ctaText: r.cta_text,
+    ctaUrl: r.cta_url,
+    closingParagraph: r.closing_paragraph,
+    signoffLine: r.signoff_line,
+    signoffSubtext: r.signoff_subtext,
+    footerNoteText: r.footer_note_text,
+    footerNoteLinkText: r.footer_note_link_text,
+    footerNoteLinkUrl: r.footer_note_link_url,
+    updatedAt: r.updated_at,
+  };
+}
+
+export async function getBroadcastDrafts(): Promise<BroadcastDraft[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("broadcast_drafts")
+    .select(BROADCAST_DRAFT_COLUMNS)
+    .order("target_date", { ascending: true });
+  if (error) {
+    console.error("[data] broadcast_drafts fetch failed (migration 022 pending?):", error.message);
+    return [];
+  }
+  return (data ?? []).map(mapBroadcastDraftRow);
+}
+
+export async function getBroadcastDraft(id: number): Promise<BroadcastDraft | null> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("broadcast_drafts")
+    .select(BROADCAST_DRAFT_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapBroadcastDraftRow(data) : null;
+}
+
+export type BroadcastDraftComment = {
+  id: number;
+  draftId: number;
+  author: string;
+  comment: string;
+  applied: boolean;
+  createdAt: string;
+};
+
+export async function getBroadcastDraftComments(draftId: number): Promise<BroadcastDraftComment[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("broadcast_draft_comments")
+    .select("id, draft_id, author, comment, applied, created_at")
+    .eq("draft_id", draftId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    draftId: r.draft_id,
+    author: r.author,
+    comment: r.comment,
+    applied: r.applied,
+    createdAt: r.created_at,
+  }));
+}
+
 export type VipSubmission = {
   contactId: number;
   name: string;

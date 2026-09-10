@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import {
   getCampaignsWithStats,
   getDailyRangeTotals,
@@ -757,9 +758,17 @@ export default async function Home({
       <DashboardHeader active="client" />
 
       <div className="mx-auto max-w-screen-2xl px-6 py-10 sm:px-10">
-        <Suspense fallback={null}>
-          <ArrangementTabs />
-        </Suspense>
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+          <Suspense fallback={null}>
+            <ArrangementTabs />
+          </Suspense>
+          <Link
+            href="/broadcast-drafts"
+            className="rounded-full border border-black/10 bg-white px-5 py-2.5 text-sm font-semibold text-charcoal shadow-sm transition-colors hover:bg-charcoal/5"
+          >
+            Marketing Schedule
+          </Link>
+        </div>
 
         <main className="min-w-0">
           {showOverview && (

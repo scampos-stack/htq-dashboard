@@ -8,7 +8,9 @@ import {
   getZendeskSummary,
   getWoodpeckerAiSummary,
   getZendeskTopicsSummary,
+  getBroadcastDraft,
   type ZendeskDateRange,
+  type BroadcastDraft,
 } from "./data";
 
 type CampaignDigest = {
@@ -625,4 +627,136 @@ export async function generateAllSourcesDigest(range: ZendeskDateRange): Promise
   if (error) throw error;
 
   return { generated: true };
+}
+
+// The editable content fields on a broadcast draft — everything else
+// (campaign_theme, target_date, list_segment, status, etc.) is metadata the
+// AI never touches, regardless of what a comment says.
+const EDITABLE_DRAFT_FIELDS = [
+  "subject",
+  "preheader",
+  "introParagraphs",
+  "highlightHeading",
+  "highlightBody",
+  "ctaText",
+  "ctaUrl",
+  "closingParagraph",
+  "signoffLine",
+  "signoffSubtext",
+  "footerNoteText",
+  "footerNoteLinkText",
+  "footerNoteLinkUrl",
+] as const;
+
+function draftContentForPrompt(draft: BroadcastDraft) {
+  const content: Record<string, unknown> = {};
+  for (const field of EDITABLE_DRAFT_FIELDS) content[field] = draft[field];
+  return content;
+}
+
+const DRAFT_FIELD_TO_COLUMN: Record<(typeof EDITABLE_DRAFT_FIELDS)[number], string> = {
+  subject: "subject",
+  preheader: "preheader",
+  introParagraphs: "intro_paragraphs",
+  highlightHeading: "highlight_heading",
+  highlightBody: "highlight_body",
+  ctaText: "cta_text",
+  ctaUrl: "cta_url",
+  closingParagraph: "closing_paragraph",
+  signoffLine: "signoff_line",
+  signoffSubtext: "signoff_subtext",
+  footerNoteText: "footer_note_text",
+  footerNoteLinkText: "footer_note_link_text",
+  footerNoteLinkUrl: "footer_note_link_url",
+};
+
+// Targeted rewrite, not a full redraft: Claude sees the draft's current
+// content plus one feedback comment (e.g. "make the CTA punchier") and
+// returns ONLY the field(s) that comment actually refers to — everything
+// else on the draft stays byte-for-byte identical. Bumps `version` so the
+// draft list can show something changed, without keeping full history
+// (out of scope for v1 — the comment thread itself is the audit trail).
+export async function regenerateBroadcastDraftFromComment(
+  draftId: number,
+  commentText: string
+): Promise<{ generated: boolean; reason?: string; changedFields?: string[] }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { generated: false, reason: "ANTHROPIC_API_KEY not configured" };
+  }
+
+  const draft = await getBroadcastDraft(draftId);
+  if (!draft) {
+    return { generated: false, reason: "Draft not found" };
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: "claude-opus-5",
+    max_tokens: 1024,
+    system:
+      "You edit one marketing email draft for an insurance-lead-generation " +
+      "company, based on a single piece of human feedback. You are given " +
+      "the draft's current content fields (JSON) and one feedback comment. " +
+      "Your job: change ONLY the field(s) the comment actually refers to, " +
+      "leaving every other field completely untouched. Never rewrite fields " +
+      "the comment doesn't mention, even if you think they could be " +
+      "improved — a human will give separate feedback for those if they " +
+      "want changes there.\n\n" +
+      "Preserve the existing tone and length of each field you do edit " +
+      "unless the comment explicitly asks to change tone/length. " +
+      "\"introParagraphs\" is an array of paragraph strings — if editing it, " +
+      "return the complete replacement array (not a diff).\n\n" +
+      "Respond with ONLY a raw JSON object (no markdown fences, no prose) " +
+      "whose keys are a subset of: " + EDITABLE_DRAFT_FIELDS.join(", ") + ". " +
+      "Include a key only if you are changing that field. If the comment " +
+      "doesn't clearly map to any field, return an empty JSON object {}.",
+    messages: [
+      {
+        role: "user",
+        content:
+          "Current draft content (JSON):\n\n" +
+          JSON.stringify(draftContentForPrompt(draft), null, 2) +
+          `\n\nFeedback comment: "${commentText}"`,
+      },
+    ],
+  });
+
+  const textBlock = response.content.find(
+    (b): b is Anthropic.TextBlock => b.type === "text"
+  );
+  const raw = textBlock?.text?.trim();
+  if (!raw) {
+    return { generated: false, reason: "Claude returned no text content" };
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    console.error("[broadcast draft regenerate] non-JSON response:", raw);
+    return { generated: false, reason: "Claude's response wasn't valid JSON" };
+  }
+
+  const changedFields = Object.keys(parsed).filter((k) =>
+    (EDITABLE_DRAFT_FIELDS as readonly string[]).includes(k)
+  );
+  if (changedFields.length === 0) {
+    return { generated: false, reason: "The comment didn't map to any editable field" };
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    version: draft.version + 1,
+    updated_at: new Date().toISOString(),
+  };
+  for (const field of changedFields) {
+    const column = DRAFT_FIELD_TO_COLUMN[field as (typeof EDITABLE_DRAFT_FIELDS)[number]];
+    updatePayload[column] = parsed[field];
+  }
+
+  const supabase = supabaseServer();
+  const { error } = await supabase.from("broadcast_drafts").update(updatePayload).eq("id", draftId);
+  if (error) throw error;
+
+  return { generated: true, changedFields };
 }
