@@ -111,9 +111,51 @@ export function BroadcastDraftForm({
   const [form, setForm] = useState<BroadcastDraftFormValues>(initialValues ?? EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [parsingHtml, setParsingHtml] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
 
   function set<K extends keyof BroadcastDraftFormValues>(key: K, value: BroadcastDraftFormValues[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // Parses the uploaded file into content fields and pre-fills the form —
+  // doesn't save anything, so the user reviews/corrects before submitting.
+  async function handleUploadHtml(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setParsingHtml(true);
+    setParseError(null);
+    try {
+      const html = await file.text();
+      const res = await fetch("/api/broadcast-drafts/parse-html", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to parse HTML");
+      const c = data.content;
+      setForm((f) => ({
+        ...f,
+        preheader: c.preheader ?? f.preheader,
+        introParagraphs: Array.isArray(c.introParagraphs) && c.introParagraphs.length ? c.introParagraphs.join("\n") : f.introParagraphs,
+        highlightHeading: c.highlightHeading ?? f.highlightHeading,
+        highlightBody: c.highlightBody ?? f.highlightBody,
+        ctaText: c.ctaText ?? f.ctaText,
+        ctaUrl: c.ctaUrl ?? f.ctaUrl,
+        closingParagraph: c.closingParagraph ?? f.closingParagraph,
+        signoffLine: c.signoffLine ?? f.signoffLine,
+        signoffSubtext: c.signoffSubtext ?? f.signoffSubtext,
+        footerNoteText: c.footerNoteText ?? f.footerNoteText,
+        footerNoteLinkText: c.footerNoteLinkText ?? f.footerNoteLinkText,
+        footerNoteLinkUrl: c.footerNoteLinkUrl ?? f.footerNoteLinkUrl,
+      }));
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "Failed to parse HTML");
+    } finally {
+      setParsingHtml(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -207,7 +249,14 @@ export function BroadcastDraftForm({
         )}
       </div>
 
-      <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-body-gray">Email Content</h4>
+      <div className="mb-4 flex items-center justify-between">
+        <h4 className="text-xs font-bold uppercase tracking-wide text-body-gray">Email Content</h4>
+        <label className="cursor-pointer rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5">
+          {parsingHtml ? "Reading…" : "Upload HTML"}
+          <input type="file" accept=".html,.htm,text/html" onChange={handleUploadHtml} className="hidden" disabled={parsingHtml} />
+        </label>
+      </div>
+      {parseError && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{parseError}</div>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {field(
           "Subject Line",
