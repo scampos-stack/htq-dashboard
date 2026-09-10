@@ -50,6 +50,14 @@ export function BroadcastDraftDetail({
     [draft]
   );
 
+  // Preview-only: opens clicked links in a new tab so testing the CTA
+  // doesn't navigate the iframe away from the email itself. Not applied to
+  // `html` (used by Copy HTML) — that stays exactly what will go into Keap.
+  const previewHtml = useMemo(
+    () => html.replace("<head>", "<head><base target=\"_blank\">"),
+    [html]
+  );
+
   async function handleCopy() {
     await navigator.clipboard.writeText(html);
     setCopied(true);
@@ -201,7 +209,7 @@ export function BroadcastDraftDetail({
           </p>
           <iframe
             ref={iframeRef}
-            srcDoc={html}
+            srcDoc={previewHtml}
             title="Email preview"
             onLoad={handleIframeLoad}
             className="w-full rounded-lg border border-black/10"
