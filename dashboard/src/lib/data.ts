@@ -1451,6 +1451,30 @@ export async function getZendeskCsatMonthlyTrend(year?: number): Promise<CsatMon
   return MONTH_LABELS.map((month, i) => ({ month, ...byMonth.get(i)! }));
 }
 
+export type CsatAgentStat = { agent: string; good: number; bad: number };
+
+export async function getZendeskCsatByAgent(): Promise<CsatAgentStat[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("zendesk_tickets")
+    .select("assignee_name, assignee_email, satisfaction_score")
+    .in("satisfaction_score", ["good", "bad"]);
+  if (error) throw error;
+
+  const byAgent = new Map<string, { good: number; bad: number }>();
+  for (const r of data ?? []) {
+    const agent = r.assignee_name || r.assignee_email || "Unassigned";
+    const entry = byAgent.get(agent) ?? { good: 0, bad: 0 };
+    if (r.satisfaction_score === "good") entry.good += 1;
+    else entry.bad += 1;
+    byAgent.set(agent, entry);
+  }
+
+  return [...byAgent.entries()]
+    .map(([agent, e]) => ({ agent, ...e }))
+    .sort((a, b) => b.good + b.bad - (a.good + a.bad));
+}
+
 export type JustCallSummary = {
   totalCalls: number;
   byDirection: { direction: string; count: number }[];

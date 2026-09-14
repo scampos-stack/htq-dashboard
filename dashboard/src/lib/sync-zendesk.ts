@@ -130,8 +130,8 @@ async function setCursor(endTime: number) {
 
 type TicketMetricResponse = {
   ticket_metric?: {
-    reply_time_in_minutes?: { calendar?: number | null } | null;
-    full_resolution_time_in_minutes?: { calendar?: number | null } | null;
+    reply_time_in_minutes?: { calendar?: number | null; business?: number | null } | null;
+    full_resolution_time_in_minutes?: { calendar?: number | null; business?: number | null } | null;
   };
 };
 
@@ -172,11 +172,16 @@ async function syncZendeskTicketMetrics(): Promise<{ metrics: number }> {
     const m = data.ticket_metric;
     if (!m) continue;
 
+    // Prefer Zendesk's own business-hours figure (excludes nights/weekends
+    // per the account's configured Business Hours schedule) over raw
+    // calendar time — falls back to calendar only if the account has no
+    // schedule configured, in which case Zendesk never populates `business`.
     const { error } = await supabase
       .from("zendesk_tickets")
       .update({
-        reply_time_minutes: m.reply_time_in_minutes?.calendar ?? null,
-        full_resolution_time_minutes: m.full_resolution_time_in_minutes?.calendar ?? null,
+        reply_time_minutes: m.reply_time_in_minutes?.business ?? m.reply_time_in_minutes?.calendar ?? null,
+        full_resolution_time_minutes:
+          m.full_resolution_time_in_minutes?.business ?? m.full_resolution_time_in_minutes?.calendar ?? null,
       })
       .eq("id", id);
     if (error) throw error;

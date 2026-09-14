@@ -15,6 +15,7 @@ import {
   getChannelBlendCategoryPatterns,
   getZendeskSummary,
   getZendeskCsatMonthlyTrend,
+  getZendeskCsatByAgent,
   getZendeskFilterOptions,
   getJustCallSummary,
   getZendeskTopicsSummary,
@@ -708,6 +709,7 @@ export default async function Home({
     channelBlendAppointmentsCount,
     bookedCallsByCarrier,
     csatMonthlyTrend,
+    csatByAgent,
   ] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
@@ -738,6 +740,7 @@ export default async function Home({
     getChannelBlendAppointmentsCount(rangeParam === "all" ? undefined : Number(rangeParam)),
     getBookedCallsByCarrier(rangeParam === "all" ? undefined : Number(rangeParam)),
     getZendeskCsatMonthlyTrend(),
+    getZendeskCsatByAgent(),
   ]);
 
   const wpStatusOptions = [...new Set(allCampaigns.map((c) => c.status).filter(Boolean))] as string[];
@@ -1129,6 +1132,7 @@ export default async function Home({
                   assigneeOptions={zendeskFilterOptions.assignees}
                   csatMonthlyTrend={csatMonthlyTrend}
                   csatMonthlyTrendYear={new Date().getFullYear()}
+                  csatByAgent={csatByAgent}
                 />
               </SectionBlock>
 

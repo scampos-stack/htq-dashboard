@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import type { ZendeskSummary, ZendeskTopicsSummary, CsatMonthPoint } from "@/lib/data";
+import type { ZendeskSummary, ZendeskTopicsSummary, CsatMonthPoint, CsatAgentStat } from "@/lib/data";
 import { HorizontalBarList } from "@/components/HorizontalBarList";
 import { DonutChart } from "@/components/DonutChart";
 import { ZendeskTopicsCard } from "@/components/ZendeskTopicsCard";
@@ -9,6 +9,7 @@ import { StatusFilter } from "@/components/StatusFilter";
 import { SectionTabs } from "@/components/SectionTabs";
 import { Metric } from "@/components/Metric";
 import { CsatMonthlyTrendChart } from "@/components/CsatMonthlyTrendChart";
+import { CsatByAgentTable } from "@/components/CsatByAgentTable";
 import { formatDuration } from "@/lib/format-duration";
 
 export function ZendeskSection({
@@ -18,6 +19,7 @@ export function ZendeskSection({
   assigneeOptions,
   csatMonthlyTrend,
   csatMonthlyTrendYear,
+  csatByAgent,
 }: {
   summary: ZendeskSummary;
   topicsSummary: ZendeskTopicsSummary;
@@ -25,6 +27,7 @@ export function ZendeskSection({
   assigneeOptions: string[];
   csatMonthlyTrend: CsatMonthPoint[];
   csatMonthlyTrendYear: number;
+  csatByAgent: CsatAgentStat[];
 }) {
   const filterBar = (
     <div className="mb-4 flex flex-wrap justify-end gap-3">
@@ -94,6 +97,7 @@ export function ZendeskSection({
   const teamTab = (
     <div className="flex flex-col gap-5">
       <ZendeskGroupedStatTable title="Tickets by Agent" columnLabel="Agent" rows={summary.byAgent} />
+      <CsatByAgentTable rows={csatByAgent} />
       <ZendeskGroupedStatTable title="Tickets by Group" columnLabel="Group" rows={summary.byGroup} />
     </div>
   );
