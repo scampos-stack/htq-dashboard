@@ -1421,6 +1421,36 @@ export async function getZendeskSummary(
   };
 }
 
+export type CsatMonthPoint = { month: string; good: number; bad: number };
+
+// Paula's own suggestion: a running month-by-month CSAT trend for the
+// current calendar year, independent of whatever date range is selected
+// elsewhere on the page — a "how are we doing this year" view rather than
+// a snapshot of one window.
+export async function getZendeskCsatMonthlyTrend(year?: number): Promise<CsatMonthPoint[]> {
+  const targetYear = year ?? new Date().getFullYear();
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("zendesk_tickets")
+    .select("satisfaction_score, created_at")
+    .in("satisfaction_score", ["good", "bad"])
+    .gte("created_at", `${targetYear}-01-01T00:00:00Z`)
+    .lt("created_at", `${targetYear + 1}-01-01T00:00:00Z`);
+  if (error) throw error;
+
+  const byMonth = new Map<number, { good: number; bad: number }>();
+  for (let m = 0; m < 12; m++) byMonth.set(m, { good: 0, bad: 0 });
+  for (const r of data ?? []) {
+    const m = new Date(r.created_at).getUTCMonth();
+    const entry = byMonth.get(m)!;
+    if (r.satisfaction_score === "good") entry.good += 1;
+    else entry.bad += 1;
+  }
+
+  const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return MONTH_LABELS.map((month, i) => ({ month, ...byMonth.get(i)! }));
+}
+
 export type JustCallSummary = {
   totalCalls: number;
   byDirection: { direction: string; count: number }[];

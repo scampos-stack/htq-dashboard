@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import type { ZendeskSummary, ZendeskTopicsSummary } from "@/lib/data";
+import type { ZendeskSummary, ZendeskTopicsSummary, CsatMonthPoint } from "@/lib/data";
 import { HorizontalBarList } from "@/components/HorizontalBarList";
 import { DonutChart } from "@/components/DonutChart";
 import { ZendeskTopicsCard } from "@/components/ZendeskTopicsCard";
@@ -8,6 +8,7 @@ import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
 import { StatusFilter } from "@/components/StatusFilter";
 import { SectionTabs } from "@/components/SectionTabs";
 import { Metric } from "@/components/Metric";
+import { CsatMonthlyTrendChart } from "@/components/CsatMonthlyTrendChart";
 import { formatDuration } from "@/lib/format-duration";
 
 export function ZendeskSection({
@@ -15,11 +16,15 @@ export function ZendeskSection({
   topicsSummary,
   groupOptions,
   assigneeOptions,
+  csatMonthlyTrend,
+  csatMonthlyTrendYear,
 }: {
   summary: ZendeskSummary;
   topicsSummary: ZendeskTopicsSummary;
   groupOptions: string[];
   assigneeOptions: string[];
+  csatMonthlyTrend: CsatMonthPoint[];
+  csatMonthlyTrendYear: number;
 }) {
   const filterBar = (
     <div className="mb-4 flex flex-wrap justify-end gap-3">
@@ -81,6 +86,8 @@ export function ZendeskSection({
           <Metric label="Avg Resolution Time" value={formatDuration(summary.avgResolutionMinutes)} />
         </div>
       </div>
+
+      <CsatMonthlyTrendChart points={csatMonthlyTrend} year={csatMonthlyTrendYear} />
     </div>
   );
 
