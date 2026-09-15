@@ -66,7 +66,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (error) throw error;
 
     if (assigneeChangeContext) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://htq-dashboard-v1.vercel.app";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://ateam.hometownquotes.com";
       await notifyTeams(
         `📋 "${assigneeChangeContext.campaignTheme}" (${assigneeChangeContext.listSegment}) is now assigned to **${update.assigned_to}**` +
           (appUrl ? ` — ${appUrl}/broadcast-drafts/${id}` : "")
