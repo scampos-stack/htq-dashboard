@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { notifyTeams } from "@/lib/teams-notify";
 
 // Partial update — the edit form only sends the fields it actually changed,
 // so this must not overwrite unspecified fields back to null.
@@ -41,8 +42,36 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     const supabase = supabaseServer();
+
+    // Only fires when assignedTo is actually changing to a new real person
+    // — not on every save of a form that always includes the field, and
+    // not on unassigning.
+    let assigneeChangeContext: { campaignTheme: string; listSegment: string; oldAssignee: string | null } | null = null;
+    if ("assigned_to" in update && update.assigned_to) {
+      const { data: current } = await supabase
+        .from("broadcast_drafts")
+        .select("campaign_theme, list_segment, assigned_to")
+        .eq("id", id)
+        .maybeSingle();
+      if (current && current.assigned_to !== update.assigned_to) {
+        assigneeChangeContext = {
+          campaignTheme: current.campaign_theme,
+          listSegment: current.list_segment,
+          oldAssignee: current.assigned_to,
+        };
+      }
+    }
+
     const { error } = await supabase.from("broadcast_drafts").update(update).eq("id", id);
     if (error) throw error;
+
+    if (assigneeChangeContext) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://htq-dashboard-v1.vercel.app";
+      await notifyTeams(
+        `📋 "${assigneeChangeContext.campaignTheme}" (${assigneeChangeContext.listSegment}) is now assigned to **${update.assigned_to}**` +
+          (appUrl ? ` — ${appUrl}/broadcast-drafts/${id}` : "")
+      );
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
