@@ -78,7 +78,7 @@ function LoginForm() {
           />
         </label>
 
-        <label className="mb-6 block text-sm font-semibold text-charcoal">
+        <label className="mb-2 block text-sm font-semibold text-charcoal">
           Password
           <input
             type="password"
@@ -88,6 +88,12 @@ function LoginForm() {
             autoComplete="current-password"
           />
         </label>
+
+        <p className="mb-6 text-right text-xs">
+          <Link href="/forgot-password" className="font-semibold text-charcoal underline">
+            Forgot password?
+          </Link>
+        </p>
 
         <button
           type="submit"

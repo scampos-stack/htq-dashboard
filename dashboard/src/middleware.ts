@@ -38,10 +38,20 @@ export async function middleware(request: NextRequest) {
 
   const isLoginPage = request.nextUrl.pathname.startsWith("/login");
   const isSignupPage = request.nextUrl.pathname.startsWith("/signup");
+  const isForgotPasswordPage = request.nextUrl.pathname.startsWith("/forgot-password");
+  const isResetPasswordPage = request.nextUrl.pathname.startsWith("/reset-password");
   const isAuthCallback = request.nextUrl.pathname.startsWith("/api/auth");
   const isWebhook = request.nextUrl.pathname.startsWith("/api/webhooks/");
 
-  if (!user && !isLoginPage && !isSignupPage && !isAuthCallback && !isWebhook) {
+  if (
+    !user &&
+    !isLoginPage &&
+    !isSignupPage &&
+    !isForgotPasswordPage &&
+    !isResetPasswordPage &&
+    !isAuthCallback &&
+    !isWebhook
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", request.nextUrl.pathname);
