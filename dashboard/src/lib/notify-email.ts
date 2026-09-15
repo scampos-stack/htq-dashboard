@@ -1,5 +1,3 @@
-import { Resend } from "resend";
-
 // Maps the fixed assignee names (see ASSIGNEE_OPTIONS in
 // BroadcastDraftForm/BroadcastDraftAssigneeSelect) to a real inbox — set via
 // env vars rather than hardcoded so recipients can change without a code
@@ -10,24 +8,31 @@ const ASSIGNEE_EMAILS: Record<string, string | undefined> = {
   Mohammed: process.env.ASSIGNEE_EMAIL_MOHAMMED,
 };
 
-// Silently no-ops (rather than throwing) if RESEND_API_KEY isn't set or the
-// assignee has no configured email — a missing/incomplete email setup
-// shouldn't block someone from saving a draft edit.
+// Sends via a Make.com scenario (Webhook -> Microsoft 365 Email/Outlook)
+// instead of a third-party email API — Teams webhooks were blocked on this
+// tenant without a Premium Power Automate plan, and this reuses Make (which
+// the account already has) plus a real Outlook connection instead of
+// needing a new service + DNS domain verification.
+// Configure MAKE_ASSIGNEE_EMAIL_WEBHOOK_URL in Vercel with the webhook URL
+// from the Make scenario.
 export async function notifyAssigneeByEmail(
   assignee: string,
   subject: string,
   body: string
 ): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
+  const webhookUrl = process.env.MAKE_ASSIGNEE_EMAIL_WEBHOOK_URL;
   const to = ASSIGNEE_EMAILS[assignee];
-  if (!apiKey || !to) return;
-
-  const from = process.env.RESEND_FROM_EMAIL ?? "HTQ Dashboard <onboarding@resend.dev>";
+  if (!webhookUrl || !to) return;
 
   try {
-    const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({ from, to, subject, text: body });
-    if (error) console.error("[notify-email] Resend error:", error);
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject, body }),
+    });
+    if (!res.ok) {
+      console.error("[notify-email] Make webhook returned", res.status, await res.text().catch(() => ""));
+    }
   } catch (err) {
     console.error("[notify-email] failed:", err);
   }
