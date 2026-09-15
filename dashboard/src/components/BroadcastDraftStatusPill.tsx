@@ -3,6 +3,7 @@ import type { BroadcastDraftStatus } from "@/lib/data";
 const STATUS_STYLE: Record<BroadcastDraftStatus, { label: string; className: string; dot: string }> = {
   not_started: { label: "Not Started", className: "bg-charcoal/10 text-charcoal", dot: "bg-body-gray" },
   writing: { label: "Writing", className: "bg-amber-500/15 text-amber-700", dot: "bg-amber-500" },
+  review: { label: "Review", className: "bg-orange-500/15 text-orange-700", dot: "bg-orange-500" },
   for_approval: { label: "For Approval", className: "bg-sky-500/15 text-sky-700", dot: "bg-sky-500" },
   approved: { label: "Approved", className: "bg-brand-green/15 text-brand-green-dark", dot: "bg-brand-green-dark" },
   sent: { label: "Sent", className: "bg-violet-500/15 text-violet-700", dot: "bg-violet-500" },

@@ -7,6 +7,7 @@ import type { BroadcastDraftStatus } from "@/lib/data";
 const STATUS_OPTIONS: { value: BroadcastDraftStatus; label: string; className: string }[] = [
   { value: "not_started", label: "Not Started", className: "bg-charcoal/10 text-charcoal" },
   { value: "writing", label: "Writing", className: "bg-amber-500/15 text-amber-700" },
+  { value: "review", label: "Review", className: "bg-orange-500/15 text-orange-700" },
   { value: "for_approval", label: "For Approval", className: "bg-sky-500/15 text-sky-700" },
   { value: "approved", label: "Approved", className: "bg-brand-green/15 text-brand-green-dark" },
   { value: "sent", label: "Sent", className: "bg-violet-500/15 text-violet-700" },

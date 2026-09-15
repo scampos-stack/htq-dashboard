@@ -7,6 +7,7 @@ const OPTIONS: { value: BroadcastDraftStatus | "all"; label: string }[] = [
   { value: "all", label: "All statuses" },
   { value: "not_started", label: "Not Started" },
   { value: "writing", label: "Writing" },
+  { value: "review", label: "Review" },
   { value: "for_approval", label: "For Approval" },
   { value: "approved", label: "Approved" },
   { value: "sent", label: "Sent" },

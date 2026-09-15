@@ -16,6 +16,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       utmCampaign: "utm_campaign",
       audienceEstimate: "audience_estimate",
       status: "status",
+      assignedTo: "assigned_to",
       subject: "subject",
       preheader: "preheader",
       introParagraphs: "intro_paragraphs",

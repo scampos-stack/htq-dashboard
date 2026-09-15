@@ -27,6 +27,7 @@ export async function POST(req: Request) {
         utm_campaign: body.utmCampaign || null,
         audience_estimate: body.audienceEstimate ? Number(body.audienceEstimate) : null,
         status: body.status || "not_started",
+        assigned_to: body.assignedTo || null,
         subject: body.subject || null,
         preheader: body.preheader || null,
         intro_paragraphs: Array.isArray(body.introParagraphs) ? body.introParagraphs : [],

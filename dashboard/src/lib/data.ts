@@ -388,7 +388,7 @@ export async function getKeapBroadcasts(): Promise<KeapBroadcast[]> {
   }));
 }
 
-export type BroadcastDraftStatus = "not_started" | "writing" | "for_approval" | "approved" | "sent";
+export type BroadcastDraftStatus = "not_started" | "writing" | "review" | "for_approval" | "approved" | "sent";
 
 export type BroadcastDraft = {
   id: number;
@@ -399,6 +399,7 @@ export type BroadcastDraft = {
   utmCampaign: string | null;
   audienceEstimate: number | null;
   status: BroadcastDraftStatus;
+  assignedTo: string | null;
   version: number;
   subject: string | null;
   preheader: string | null;
@@ -417,6 +418,10 @@ export type BroadcastDraft = {
 };
 
 const BROADCAST_DRAFT_COLUMNS =
+  "id, campaign_theme, target_date, list_segment, focus, utm_campaign, audience_estimate, status, assigned_to, version, subject, preheader, intro_paragraphs, highlight_heading, highlight_body, cta_text, cta_url, closing_paragraph, signoff_line, signoff_subtext, footer_note_text, footer_note_link_text, footer_note_link_url, updated_at";
+
+// Migration 025 (assigned_to column) may not have run yet.
+const BROADCAST_DRAFT_COLUMNS_FALLBACK =
   "id, campaign_theme, target_date, list_segment, focus, utm_campaign, audience_estimate, status, version, subject, preheader, intro_paragraphs, highlight_heading, highlight_body, cta_text, cta_url, closing_paragraph, signoff_line, signoff_subtext, footer_note_text, footer_note_link_text, footer_note_link_url, updated_at";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -430,6 +435,7 @@ function mapBroadcastDraftRow(r: any): BroadcastDraft {
     utmCampaign: r.utm_campaign,
     audienceEstimate: r.audience_estimate,
     status: r.status,
+    assignedTo: r.assigned_to ?? null,
     version: r.version,
     subject: r.subject,
     preheader: r.preheader,
@@ -455,7 +461,17 @@ export async function getBroadcastDrafts(status?: BroadcastDraftStatus): Promise
     .select(BROADCAST_DRAFT_COLUMNS)
     .order("target_date", { ascending: true });
   if (status) query = query.eq("status", status);
-  const { data, error } = await query;
+  let { data, error } = await query;
+  if (error) {
+    let fallbackQuery = supabase
+      .from("broadcast_drafts")
+      .select(BROADCAST_DRAFT_COLUMNS_FALLBACK)
+      .order("target_date", { ascending: true });
+    if (status) fallbackQuery = fallbackQuery.eq("status", status);
+    const fallback = await fallbackQuery;
+    data = fallback.data?.map((r) => ({ ...r, assigned_to: null })) ?? null;
+    error = fallback.error;
+  }
   if (error) {
     console.error("[data] broadcast_drafts fetch failed (migration 022 pending?):", error.message);
     return [];
@@ -465,11 +481,20 @@ export async function getBroadcastDrafts(status?: BroadcastDraftStatus): Promise
 
 export async function getBroadcastDraft(id: number): Promise<BroadcastDraft | null> {
   const supabase = supabaseServer();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("broadcast_drafts")
     .select(BROADCAST_DRAFT_COLUMNS)
     .eq("id", id)
     .maybeSingle();
+  if (error) {
+    const fallback = await supabase
+      .from("broadcast_drafts")
+      .select(BROADCAST_DRAFT_COLUMNS_FALLBACK)
+      .eq("id", id)
+      .maybeSingle();
+    data = fallback.data ? { ...fallback.data, assigned_to: null } : null;
+    error = fallback.error;
+  }
   if (error) throw error;
   return data ? mapBroadcastDraftRow(data) : null;
 }

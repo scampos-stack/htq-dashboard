@@ -7,7 +7,7 @@ import { BroadcastDraftStatusFilter } from "@/components/BroadcastDraftStatusFil
 
 export const dynamic = "force-dynamic";
 
-const VALID_STATUSES: BroadcastDraftStatus[] = ["not_started", "writing", "for_approval", "approved", "sent"];
+const VALID_STATUSES: BroadcastDraftStatus[] = ["not_started", "writing", "review", "for_approval", "approved", "sent"];
 
 export default async function BroadcastDraftsPage({
   searchParams,

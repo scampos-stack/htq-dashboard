@@ -7,10 +7,13 @@ import type { BroadcastDraft, BroadcastDraftStatus } from "@/lib/data";
 const STATUS_OPTIONS: { value: BroadcastDraftStatus; label: string }[] = [
   { value: "not_started", label: "Not Started" },
   { value: "writing", label: "Writing" },
+  { value: "review", label: "Review" },
   { value: "for_approval", label: "For Approval" },
   { value: "approved", label: "Approved" },
   { value: "sent", label: "Sent" },
 ];
+
+const ASSIGNEE_OPTIONS = ["Unassigned", "Paula", "Sarah", "Mohammed"];
 
 export type BroadcastDraftFormValues = {
   campaignTheme: string;
@@ -20,6 +23,7 @@ export type BroadcastDraftFormValues = {
   utmCampaign: string;
   audienceEstimate: string;
   status: BroadcastDraftStatus;
+  assignedTo: string;
   subject: string;
   preheader: string;
   introParagraphs: string; // textarea, one paragraph per line
@@ -43,6 +47,7 @@ const EMPTY: BroadcastDraftFormValues = {
   utmCampaign: "",
   audienceEstimate: "",
   status: "not_started",
+  assignedTo: "Unassigned",
   subject: "",
   preheader: "",
   introParagraphs: "",
@@ -67,6 +72,7 @@ export function draftToFormValues(draft: BroadcastDraft): BroadcastDraftFormValu
     utmCampaign: draft.utmCampaign ?? "",
     audienceEstimate: draft.audienceEstimate != null ? String(draft.audienceEstimate) : "",
     status: draft.status,
+    assignedTo: draft.assignedTo ?? "Unassigned",
     subject: draft.subject ?? "",
     preheader: draft.preheader ?? "",
     introParagraphs: draft.introParagraphs.join("\n"),
@@ -175,6 +181,7 @@ export function BroadcastDraftForm({
         utmCampaign: form.utmCampaign,
         audienceEstimate: form.audienceEstimate,
         status: form.status,
+        assignedTo: form.assignedTo === "Unassigned" ? null : form.assignedTo,
         subject: form.subject,
         preheader: form.preheader,
         introParagraphs: form.introParagraphs.split("\n").map((p) => p.trim()).filter(Boolean),
@@ -244,6 +251,14 @@ export function BroadcastDraftForm({
           <select value={form.status} onChange={(e) => set("status", e.target.value as BroadcastDraftStatus)} className={inputClass}>
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        )}
+        {field(
+          "Assigned To",
+          <select value={form.assignedTo} onChange={(e) => set("assignedTo", e.target.value)} className={inputClass}>
+            {ASSIGNEE_OPTIONS.map((a) => (
+              <option key={a} value={a}>{a}</option>
             ))}
           </select>
         )}

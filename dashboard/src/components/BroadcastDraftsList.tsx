@@ -75,6 +75,11 @@ export function BroadcastDraftsList({ drafts }: { drafts: BroadcastDraft[] }) {
                       )}
                     </div>
                     <div className="flex items-center gap-3">
+                      {d.assignedTo && (
+                        <span className="rounded-full bg-violet-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-violet-700">
+                          {d.assignedTo}
+                        </span>
+                      )}
                       <BroadcastDraftStatusPill status={d.status} />
                       <span className="text-xs font-semibold text-sky-600">View / Edit →</span>
                     </div>
