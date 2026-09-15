@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { notifyTeams } from "@/lib/teams-notify";
+import { notifyAssigneeByEmail } from "@/lib/notify-email";
 
 // Partial update — the edit form only sends the fields it actually changed,
 // so this must not overwrite unspecified fields back to null.
@@ -67,10 +68,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     if (assigneeChangeContext) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://ateam.hometownquotes.com";
-      await notifyTeams(
-        `📋 "${assigneeChangeContext.campaignTheme}" (${assigneeChangeContext.listSegment}) is now assigned to **${update.assigned_to}**` +
-          (appUrl ? ` — ${appUrl}/broadcast-drafts/${id}` : "")
-      );
+      const link = `${appUrl}/broadcast-drafts/${id}`;
+      const assignee = String(update.assigned_to);
+
+      // Teams stays wired up as a harmless no-op (see notifyTeams) in case
+      // a webhook ever becomes available later — email is the real channel
+      // for now, since Teams is blocked on this tenant without Premium.
+      await Promise.all([
+        notifyTeams(
+          `📋 "${assigneeChangeContext.campaignTheme}" (${assigneeChangeContext.listSegment}) is now assigned to **${assignee}** — ${link}`
+        ),
+        notifyAssigneeByEmail(
+          assignee,
+          `Assigned to you: ${assigneeChangeContext.campaignTheme}`,
+          `"${assigneeChangeContext.campaignTheme}" (${assigneeChangeContext.listSegment}) is now assigned to you.\n\n${link}`
+        ),
+      ]);
     }
 
     return NextResponse.json({ ok: true });
