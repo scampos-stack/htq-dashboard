@@ -49,11 +49,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // not on unassigning.
     let assigneeChangeContext: { campaignTheme: string; listSegment: string; oldAssignee: string | null } | null = null;
     if ("assigned_to" in update && update.assigned_to) {
-      const { data: current } = await supabase
+      const { data: current, error: currentErr } = await supabase
         .from("broadcast_drafts")
         .select("campaign_theme, list_segment, assigned_to")
         .eq("id", id)
         .maybeSingle();
+      console.log(
+        "[broadcast-draft patch] assignee check:",
+        JSON.stringify({ id, newAssignee: update.assigned_to, current, currentErr: currentErr?.message })
+      );
       if (current && current.assigned_to !== update.assigned_to) {
         assigneeChangeContext = {
           campaignTheme: current.campaign_theme,
@@ -61,6 +65,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           oldAssignee: current.assigned_to,
         };
       }
+    } else {
+      console.log("[broadcast-draft patch] no assignee-change check — 'assigned_to' not in update or falsy:", JSON.stringify(update));
     }
 
     const { error } = await supabase.from("broadcast_drafts").update(update).eq("id", id);

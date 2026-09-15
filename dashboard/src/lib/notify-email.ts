@@ -22,7 +22,14 @@ export async function notifyAssigneeByEmail(
 ): Promise<void> {
   const webhookUrl = process.env.MAKE_ASSIGNEE_EMAIL_WEBHOOK_URL;
   const to = ASSIGNEE_EMAILS[assignee];
-  if (!webhookUrl || !to) return;
+  console.log(
+    "[notify-email] attempt:",
+    JSON.stringify({ assignee, hasWebhookUrl: !!webhookUrl, resolvedTo: to ?? null })
+  );
+  if (!webhookUrl || !to) {
+    console.log("[notify-email] skipped — missing webhook URL or no email configured for", assignee);
+    return;
+  }
 
   try {
     const res = await fetch(webhookUrl, {
@@ -30,6 +37,7 @@ export async function notifyAssigneeByEmail(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to, subject, body }),
     });
+    console.log("[notify-email] webhook response status:", res.status);
     if (!res.ok) {
       console.error("[notify-email] Make webhook returned", res.status, await res.text().catch(() => ""));
     }
