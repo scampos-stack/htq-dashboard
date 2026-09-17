@@ -29,13 +29,18 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
   const introParagraphs: string[] = [];
   let highlightHeading: string | null = null;
   let highlightBody: string | null = null;
+  let highlightBullets: string[] = [];
   let ctaText: string | null = null;
   let ctaUrl: string | null = null;
-  const closingParagraphs: string[] = [];
+  // Everything after the first table block, in document order — split into
+  // closing paragraphs vs. signoff only after the full pass (see below),
+  // since a short "mini-heading" paragraph (e.g. "Why This Matters") in the
+  // middle of real closing copy would otherwise get misread as a signoff
+  // line by a single forward pass that only looks at length.
+  const trailingLines: string[] = [];
   let footerNoteText: string | null = null;
   let footerNoteLinkText: string | null = null;
   let footerNoteLinkUrl: string | null = null;
-  const signoffParagraphs: string[] = [];
 
   let sawGreeting = false;
   let sawBlock = false; // true once we've passed the first table block (highlight or CTA)
@@ -45,24 +50,23 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
     const tag = el.tagName?.toLowerCase();
 
     if (tag === "p") {
-      const text = node.text().trim();
-      if (!text) return;
-      if (!sawGreeting && /Hi\s+~?Contact\.FirstName~?,?/i.test(text)) {
+      // A signoff like "Talk soon,<br>The Hometown Quotes Team" is one <p>
+      // with an embedded <br> — split on it so both halves survive as
+      // separate lines instead of getting jammed into one run-on string.
+      const rawHtml = node.html() ?? "";
+      const lines = /<br\s*\/?>/i.test(rawHtml)
+        ? rawHtml.split(/<br\s*\/?>/i).map((f) => cheerio.load(`<div>${f}</div>`)("div").text().trim()).filter(Boolean)
+        : [node.text().trim()];
+      if (lines.length === 0) return;
+
+      if (!sawGreeting && /Hi\s+~?Contact\.FirstName~?,?/i.test(lines[0])) {
         sawGreeting = true;
         return;
       }
       if (!sawBlock) {
-        introParagraphs.push(text);
+        introParagraphs.push(...lines);
       } else {
-        // After the first table block, short trailing paragraphs are
-        // signoff lines (e.g. "Your friends at ..." / "For agents. By
-        // agents.") rather than body copy — anything substantially longer
-        // reads as a genuine closing paragraph instead.
-        if (text.length > 90 && closingParagraphs.length === 0 && signoffParagraphs.length === 0) {
-          closingParagraphs.push(text);
-        } else {
-          signoffParagraphs.push(text);
-        }
+        trailingLines.push(...lines);
       }
       return;
     }
@@ -91,30 +95,75 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
         return;
       }
 
-      // Otherwise treat it as the highlight box: first inner block is the
-      // bold heading, the next is the body copy.
+      // Highlight box: two real shapes seen — (a) two separate <div>s
+      // (bold heading div + plain-text body div), or (b) one flat <td> with
+      // <strong>heading</strong><br> followed by &bull;-prefixed lines
+      // separated by <br> (a bulleted recap list). Splitting on <br> first
+      // and inspecting each resulting line is what makes (b) actually
+      // recoverable — text() alone collapses every <br> with no separator,
+      // which is what silently mangled real bulleted highlight boxes on
+      // import before this fix.
       const divs = node.find("td > div, td > font > div");
-      if (divs.length > 0) {
+      if (divs.length > 1) {
         highlightHeading = divs.first().text().trim() || null;
-        if (divs.length > 1) highlightBody = divs.eq(1).text().trim() || null;
+        highlightBody = divs.eq(1).text().trim() || null;
       } else {
-        highlightBody = node.find("td").first().text().trim() || null;
+        const cell = node.find("td").first();
+        const lines = (cell.html() ?? "")
+          .split(/<br\s*\/?>/i)
+          .map((fragment) => cheerio.load(`<div>${fragment}</div>`)("div").text().trim())
+          .filter(Boolean);
+
+        const bulletLines: string[] = [];
+        const plainLines: string[] = [];
+        for (const line of lines) {
+          const isHeadingTag = /^<(strong|b)>/i.test(cell.html() ?? "") && lines.indexOf(line) === 0;
+          const bulletMatch = line.match(/^[•*\-]\s*(.+)$/);
+          if (isHeadingTag && !highlightHeading) {
+            highlightHeading = line;
+          } else if (bulletMatch) {
+            bulletLines.push(bulletMatch[1].trim());
+          } else {
+            plainLines.push(line);
+          }
+        }
+        if (bulletLines.length > 0) {
+          highlightBullets = bulletLines;
+          // A heading line wasn't caught by the isHeadingTag check above
+          // (e.g. no <strong> wrapper) but reads as one anyway — the first
+          // plain line before any bullets, short, ending in ":".
+          if (!highlightHeading && plainLines.length > 0 && plainLines[0].endsWith(":")) {
+            highlightHeading = plainLines.shift() ?? null;
+          }
+        } else if (plainLines.length > 0) {
+          highlightBody = plainLines.join(" ");
+        }
       }
       sawBlock = true;
       return;
     }
   });
 
+  // The last 1-2 short lines (e.g. "Your friends at Hometown Quotes",
+  // "For agents. By agents.") are the signoff; everything before that,
+  // however many lines, is closing body copy.
+  const remaining = [...trailingLines];
+  const signoffCandidates: string[] = [];
+  while (remaining.length > 0 && signoffCandidates.length < 2 && remaining[remaining.length - 1].length <= 60) {
+    signoffCandidates.unshift(remaining.pop()!);
+  }
+
   return {
     preheader,
     introParagraphs,
     highlightHeading,
     highlightBody,
+    highlightBullets,
     ctaText,
     ctaUrl,
-    closingParagraph: closingParagraphs[0] ?? null,
-    signoffLine: signoffParagraphs[0] ?? null,
-    signoffSubtext: signoffParagraphs[1] ?? null,
+    closingParagraphs: remaining,
+    signoffLine: signoffCandidates[0] ?? null,
+    signoffSubtext: signoffCandidates[1] ?? null,
     footerNoteText,
     footerNoteLinkText,
     footerNoteLinkUrl,

@@ -638,9 +638,10 @@ const EDITABLE_DRAFT_FIELDS = [
   "introParagraphs",
   "highlightHeading",
   "highlightBody",
+  "highlightBullets",
   "ctaText",
   "ctaUrl",
-  "closingParagraph",
+  "closingParagraphs",
   "signoffLine",
   "signoffSubtext",
   "footerNoteText",
@@ -660,9 +661,10 @@ const DRAFT_FIELD_TO_COLUMN: Record<(typeof EDITABLE_DRAFT_FIELDS)[number], stri
   introParagraphs: "intro_paragraphs",
   highlightHeading: "highlight_heading",
   highlightBody: "highlight_body",
+  highlightBullets: "highlight_bullets",
   ctaText: "cta_text",
   ctaUrl: "cta_url",
-  closingParagraph: "closing_paragraph",
+  closingParagraphs: "closing_paragraphs",
   signoffLine: "signoff_line",
   signoffSubtext: "signoff_subtext",
   footerNoteText: "footer_note_text",
@@ -706,13 +708,14 @@ export async function regenerateBroadcastDraftFromComment(
       "want changes there.\n\n" +
       "Preserve the existing tone and length of each field you do edit " +
       "unless the comment explicitly asks to change tone/length. " +
-      "\"introParagraphs\" is an array of paragraph strings — if editing it, " +
-      "return the complete replacement array (not a diff).\n\n" +
+      "\"introParagraphs\", \"closingParagraphs\", and \"highlightBullets\" " +
+      "are each an array of strings — if editing one, return the complete " +
+      "replacement array (not a diff).\n\n" +
       (selectedText
         ? "The human highlighted an exact phrase in the preview before " +
           "commenting — treat that phrase as the precise anchor for the " +
           "comment. Find which field currently contains that phrase (it " +
-          "may be inside one entry of introParagraphs, not necessarily the " +
+          "may be inside one entry of an array field, not necessarily the " +
           "whole field) and edit only that field accordingly.\n\n"
         : "") +
       "Respond with ONLY a raw JSON object (no markdown fences, no prose) " +

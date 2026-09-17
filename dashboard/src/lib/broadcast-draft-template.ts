@@ -3,9 +3,10 @@ export type BroadcastDraftContent = {
   introParagraphs: string[];
   highlightHeading: string | null;
   highlightBody: string | null;
+  highlightBullets: string[];
   ctaText: string | null;
   ctaUrl: string | null;
-  closingParagraph: string | null;
+  closingParagraphs: string[];
   signoffLine: string | null;
   signoffSubtext: string | null;
   footerNoteText: string | null;
@@ -22,12 +23,23 @@ function esc(s: string): string {
 // so every draft previews exactly like what will actually go out — swap
 // this function's markup if the real Keap template ever changes.
 export function renderBroadcastDraftHtml(c: BroadcastDraftContent): string {
+  // Two highlight-box styles seen in real sends: a short plain paragraph
+  // (highlightBody — e.g. "No credit card. No contract.") or a bulleted
+  // recap list (highlightBullets — e.g. "How Our CRM Integrations Help..."),
+  // never both at once in practice, so bullets take priority when present.
+  const highlightBullets = c.highlightBullets.filter((b) => b.trim());
   const highlightBox =
-    c.highlightHeading || c.highlightBody
+    c.highlightHeading || c.highlightBody || highlightBullets.length > 0
       ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0;background-color:#F3F7EF;border-left:4px solid #5B9E31;"><tr>
 <td style="padding:20px 22px;font-family:Arial, Helvetica, sans-serif;">
 ${c.highlightHeading ? `<div style="font-size:16px;font-weight:bold;color:#2F3E1E;padding-bottom:8px;">${esc(c.highlightHeading)}</div>` : ""}
-${c.highlightBody ? `<div style="font-size:15px;line-height:1.6;color:#333333;">${esc(c.highlightBody)}</div>` : ""}
+${
+  highlightBullets.length > 0
+    ? `<div style="font-size:15px;line-height:1.6;color:#333333;">${highlightBullets.map((b) => `&bull;&nbsp; ${esc(b)}`).join("<br>\n")}</div>`
+    : c.highlightBody
+      ? `<div style="font-size:15px;line-height:1.6;color:#333333;">${esc(c.highlightBody)}</div>`
+      : ""
+}
 </td></tr></table>`
       : "";
 
@@ -64,7 +76,7 @@ ${c.footerNoteLinkText && c.footerNoteLinkUrl ? ` <a href="${esc(c.footerNoteLin
 ${c.introParagraphs.map((p) => `<p style="margin:0 0 18px 0;">${esc(p)}</p>`).join("\n")}
 ${highlightBox}
 ${ctaButton}
-${c.closingParagraph ? `<p style="margin:0;">${esc(c.closingParagraph)}</p>` : ""}
+${c.closingParagraphs.filter((p) => p.trim()).map((p) => `<p style="margin:0 0 18px 0;">${esc(p)}</p>`).join("\n")}
 ${footerNote}
 ${c.signoffLine ? `<p style="margin:26px 0 0 0;">${esc(c.signoffLine)}</p>` : ""}
 ${c.signoffSubtext ? `<p style="margin:2px 0 0 0;font-size:13px;color:#777777;">${esc(c.signoffSubtext)}</p>` : ""}

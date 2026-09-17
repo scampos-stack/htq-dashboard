@@ -29,9 +29,10 @@ export type BroadcastDraftFormValues = {
   introParagraphs: string; // textarea, one paragraph per line
   highlightHeading: string;
   highlightBody: string;
+  highlightBullets: string; // textarea, one bullet per line
   ctaText: string;
   ctaUrl: string;
-  closingParagraph: string;
+  closingParagraphs: string; // textarea, one paragraph per line
   signoffLine: string;
   signoffSubtext: string;
   footerNoteText: string;
@@ -53,9 +54,10 @@ const EMPTY: BroadcastDraftFormValues = {
   introParagraphs: "",
   highlightHeading: "",
   highlightBody: "",
+  highlightBullets: "",
   ctaText: "",
   ctaUrl: "",
-  closingParagraph: "",
+  closingParagraphs: "",
   signoffLine: "Your friends at Hometown Quotes",
   signoffSubtext: "For agents. By agents.",
   footerNoteText: "",
@@ -78,9 +80,10 @@ export function draftToFormValues(draft: BroadcastDraft): BroadcastDraftFormValu
     introParagraphs: draft.introParagraphs.join("\n"),
     highlightHeading: draft.highlightHeading ?? "",
     highlightBody: draft.highlightBody ?? "",
+    highlightBullets: draft.highlightBullets.join("\n"),
     ctaText: draft.ctaText ?? "",
     ctaUrl: draft.ctaUrl ?? "",
-    closingParagraph: draft.closingParagraph ?? "",
+    closingParagraphs: draft.closingParagraphs.join("\n"),
     signoffLine: draft.signoffLine ?? "",
     signoffSubtext: draft.signoffSubtext ?? "",
     footerNoteText: draft.footerNoteText ?? "",
@@ -148,9 +151,10 @@ export function BroadcastDraftForm({
         introParagraphs: Array.isArray(c.introParagraphs) && c.introParagraphs.length ? c.introParagraphs.join("\n") : f.introParagraphs,
         highlightHeading: c.highlightHeading ?? f.highlightHeading,
         highlightBody: c.highlightBody ?? f.highlightBody,
+        highlightBullets: Array.isArray(c.highlightBullets) && c.highlightBullets.length ? c.highlightBullets.join("\n") : f.highlightBullets,
         ctaText: c.ctaText ?? f.ctaText,
         ctaUrl: c.ctaUrl ?? f.ctaUrl,
-        closingParagraph: c.closingParagraph ?? f.closingParagraph,
+        closingParagraphs: Array.isArray(c.closingParagraphs) && c.closingParagraphs.length ? c.closingParagraphs.join("\n") : f.closingParagraphs,
         signoffLine: c.signoffLine ?? f.signoffLine,
         signoffSubtext: c.signoffSubtext ?? f.signoffSubtext,
         footerNoteText: c.footerNoteText ?? f.footerNoteText,
@@ -187,9 +191,10 @@ export function BroadcastDraftForm({
         introParagraphs: form.introParagraphs.split("\n").map((p) => p.trim()).filter(Boolean),
         highlightHeading: form.highlightHeading,
         highlightBody: form.highlightBody,
+        highlightBullets: form.highlightBullets.split("\n").map((b) => b.trim()).filter(Boolean),
         ctaText: form.ctaText,
         ctaUrl: form.ctaUrl,
-        closingParagraph: form.closingParagraph,
+        closingParagraphs: form.closingParagraphs.split("\n").map((p) => p.trim()).filter(Boolean),
         signoffLine: form.signoffLine,
         signoffSubtext: form.signoffSubtext,
         footerNoteText: form.footerNoteText,
@@ -293,9 +298,17 @@ export function BroadcastDraftForm({
           <input value={form.highlightHeading} onChange={(e) => set("highlightHeading", e.target.value)} className={inputClass} />
         )}
         {field(
-          "Highlight Box Body (optional)",
-          <input value={form.highlightBody} onChange={(e) => set("highlightBody", e.target.value)} className={inputClass} />
+          "Highlight Box Body — plain paragraph (optional)",
+          <input value={form.highlightBody} onChange={(e) => set("highlightBody", e.target.value)} className={inputClass} placeholder="e.g. No credit card. No contract." />
         )}
+        {field(
+          "Highlight Box Bullets — one per line (optional)",
+          <textarea value={form.highlightBullets} onChange={(e) => set("highlightBullets", e.target.value)} className={`${inputClass} min-h-[90px]`} placeholder={"Leads delivered in real time\nEliminate manual entry\n..."} />,
+          "full"
+        )}
+        <p className="sm:col-span-2 -mt-2 text-[11px] text-body-gray">
+          Use Body for a short paragraph-style highlight, or Bullets for a recap list — not usually both. Bullets take priority if both are filled in.
+        </p>
         {field(
           "CTA Button Text",
           <input value={form.ctaText} onChange={(e) => set("ctaText", e.target.value)} className={inputClass} />
@@ -305,8 +318,8 @@ export function BroadcastDraftForm({
           <input value={form.ctaUrl} onChange={(e) => set("ctaUrl", e.target.value)} className={inputClass} />
         )}
         {field(
-          "Closing Paragraph (optional)",
-          <textarea value={form.closingParagraph} onChange={(e) => set("closingParagraph", e.target.value)} className={`${inputClass} min-h-[70px]`} />,
+          "Closing Paragraphs — one per line (optional)",
+          <textarea value={form.closingParagraphs} onChange={(e) => set("closingParagraphs", e.target.value)} className={`${inputClass} min-h-[90px]`} />,
           "full"
         )}
         {field(

@@ -406,9 +406,10 @@ export type BroadcastDraft = {
   introParagraphs: string[];
   highlightHeading: string | null;
   highlightBody: string | null;
+  highlightBullets: string[];
   ctaText: string | null;
   ctaUrl: string | null;
-  closingParagraph: string | null;
+  closingParagraphs: string[];
   signoffLine: string | null;
   signoffSubtext: string | null;
   footerNoteText: string | null;
@@ -418,10 +419,14 @@ export type BroadcastDraft = {
 };
 
 const BROADCAST_DRAFT_COLUMNS =
-  "id, campaign_theme, target_date, list_segment, focus, utm_campaign, audience_estimate, status, assigned_to, version, subject, preheader, intro_paragraphs, highlight_heading, highlight_body, cta_text, cta_url, closing_paragraph, signoff_line, signoff_subtext, footer_note_text, footer_note_link_text, footer_note_link_url, updated_at";
+  "id, campaign_theme, target_date, list_segment, focus, utm_campaign, audience_estimate, status, assigned_to, version, subject, preheader, intro_paragraphs, highlight_heading, highlight_body, highlight_bullets, cta_text, cta_url, closing_paragraph, closing_paragraphs, signoff_line, signoff_subtext, footer_note_text, footer_note_link_text, footer_note_link_url, updated_at";
 
-// Migration 025 (assigned_to column) may not have run yet.
-const BROADCAST_DRAFT_COLUMNS_FALLBACK =
+// Baseline (migration 022 only) — used if the full select fails, which
+// means one of migrations 025/026/027 hasn't run yet. Rather than cascade
+// through every partial-migration combination, this single fallback covers
+// all of them at once: a narrow, short-lived gap in practice since
+// migrations get run right after they're given.
+const BROADCAST_DRAFT_COLUMNS_BASELINE =
   "id, campaign_theme, target_date, list_segment, focus, utm_campaign, audience_estimate, status, version, subject, preheader, intro_paragraphs, highlight_heading, highlight_body, cta_text, cta_url, closing_paragraph, signoff_line, signoff_subtext, footer_note_text, footer_note_link_text, footer_note_link_url, updated_at";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -442,9 +447,12 @@ function mapBroadcastDraftRow(r: any): BroadcastDraft {
     introParagraphs: r.intro_paragraphs ?? [],
     highlightHeading: r.highlight_heading,
     highlightBody: r.highlight_body,
+    highlightBullets: r.highlight_bullets ?? [],
     ctaText: r.cta_text,
     ctaUrl: r.cta_url,
-    closingParagraph: r.closing_paragraph,
+    // Falls back to the old single-string column for rows saved before
+    // this became an array (migration 027) — those still round-trip fine.
+    closingParagraphs: r.closing_paragraphs?.length ? r.closing_paragraphs : r.closing_paragraph ? [r.closing_paragraph] : [],
     signoffLine: r.signoff_line,
     signoffSubtext: r.signoff_subtext,
     footerNoteText: r.footer_note_text,
@@ -465,11 +473,11 @@ export async function getBroadcastDrafts(status?: BroadcastDraftStatus): Promise
   if (error) {
     let fallbackQuery = supabase
       .from("broadcast_drafts")
-      .select(BROADCAST_DRAFT_COLUMNS_FALLBACK)
+      .select(BROADCAST_DRAFT_COLUMNS_BASELINE)
       .order("target_date", { ascending: true });
     if (status) fallbackQuery = fallbackQuery.eq("status", status);
     const fallback = await fallbackQuery;
-    data = fallback.data?.map((r) => ({ ...r, assigned_to: null })) ?? null;
+    data = fallback.data?.map((r) => ({ ...r, assigned_to: null, highlight_bullets: [], closing_paragraphs: [] })) ?? null;
     error = fallback.error;
   }
   if (error) {
@@ -489,10 +497,10 @@ export async function getBroadcastDraft(id: number): Promise<BroadcastDraft | nu
   if (error) {
     const fallback = await supabase
       .from("broadcast_drafts")
-      .select(BROADCAST_DRAFT_COLUMNS_FALLBACK)
+      .select(BROADCAST_DRAFT_COLUMNS_BASELINE)
       .eq("id", id)
       .maybeSingle();
-    data = fallback.data ? { ...fallback.data, assigned_to: null } : null;
+    data = fallback.data ? { ...fallback.data, assigned_to: null, highlight_bullets: [], closing_paragraphs: [] } : null;
     error = fallback.error;
   }
   if (error) throw error;
