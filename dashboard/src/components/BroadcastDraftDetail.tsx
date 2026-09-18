@@ -20,6 +20,7 @@ export function BroadcastDraftDetail({
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [posting, setPosting] = useState(false);
@@ -65,6 +66,21 @@ export function BroadcastDraftDetail({
     await navigator.clipboard.writeText(html);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Delete "${draft.campaignTheme}" (${draft.listSegment})? This can't be undone.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/broadcast-drafts/${draft.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to delete draft");
+      router.push("/broadcast-drafts");
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete draft");
+      setDeleting(false);
+    }
   }
 
   // The iframe reloads its document every time `html` changes (srcDoc), so
@@ -191,12 +207,21 @@ export function BroadcastDraftDetail({
             {draft.version}
           </p>
         </div>
-        <button
-          onClick={() => setEditing(true)}
-          className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
-        >
-          Edit
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setEditing(true)}
+            className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
+          >
+            Edit
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-60"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        </div>
       </div>
 
       {error && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}

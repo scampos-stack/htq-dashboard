@@ -95,18 +95,29 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
         return;
       }
 
-      // Highlight box: two real shapes seen — (a) two separate <div>s
-      // (bold heading div + plain-text body div), or (b) one flat <td> with
+      // Highlight box: three real shapes seen — (a) two separate <div>s
+      // (bold heading div + plain-text body div), (b) one flat <td> with
       // <strong>heading</strong><br> followed by &bull;-prefixed lines
-      // separated by <br> (a bulleted recap list). Splitting on <br> first
-      // and inspecting each resulting line is what makes (b) actually
-      // recoverable — text() alone collapses every <br> with no separator,
-      // which is what silently mangled real bulleted highlight boxes on
-      // import before this fix.
+      // separated by <br>, or (c) a heading <p>/<div> followed by a NESTED
+      // <table> where each bullet is its own <tr> (a bullet-icon <td> + a
+      // text <td>). (c) needs its own branch — there's no <br> to split on
+      // at all, so the <br>-splitting logic for (b) would just concatenate
+      // the heading and every bullet's text into one run-on string.
       const divs = node.find("td > div, td > font > div");
+      const nestedTable = node.find("td > table");
+      const bulletRows = nestedTable.find("tr").filter((_, tr) => $(tr).find("td").length >= 2);
+
       if (divs.length > 1) {
         highlightHeading = divs.first().text().trim() || null;
         highlightBody = divs.eq(1).text().trim() || null;
+      } else if (nestedTable.length > 0 && bulletRows.length > 0) {
+        const outerCell = node.find("td").first();
+        const headingEl = outerCell.find("> p, > div, > strong, > b").first();
+        highlightHeading = headingEl.text().trim() || null;
+        highlightBullets = bulletRows
+          .map((_, tr) => $(tr).find("td").last().text().trim())
+          .get()
+          .filter(Boolean);
       } else {
         const cell = node.find("td").first();
         const lines = (cell.html() ?? "")
