@@ -16,6 +16,7 @@ import {
   getZendeskSummary,
   getZendeskCsatMonthlyTrend,
   getZendeskCsatByAgent,
+  getArchivedSectionKeys,
   getZendeskFilterOptions,
   getJustCallSummary,
   getZendeskTopicsSummary,
@@ -42,6 +43,7 @@ import { HorizontalBarList } from "@/components/HorizontalBarList";
 import { VerticalBarChart } from "@/components/VerticalBarChart";
 import { DonutChart } from "@/components/DonutChart";
 import { Collapsible } from "@/components/Collapsible";
+import { SectionArchiveButton } from "@/components/SectionArchiveButton";
 import { JumpNav } from "@/components/JumpNav";
 import { CampaignStepBreakdown } from "@/components/CampaignStepBreakdown";
 import { CampaignEmailContent } from "@/components/CampaignEmailContent";
@@ -105,17 +107,20 @@ function SectionBlock({
   id,
   title,
   accent,
+  actions,
   children,
 }: {
   id?: string;
   title: string;
   accent: string;
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section id={id} className="mb-10 scroll-mt-6">
-      <div className={`mb-4 flex items-center gap-2 border-l-4 ${accent} pl-3`}>
+      <div className={`mb-4 flex items-center justify-between gap-2 border-l-4 ${accent} pl-3`}>
         <h2 className="font-heading text-xl font-semibold text-charcoal">{title}</h2>
+        {actions}
       </div>
       {children}
     </section>
@@ -710,6 +715,7 @@ export default async function Home({
     bookedCallsByCarrier,
     csatMonthlyTrend,
     csatByAgent,
+    archivedSectionKeys,
   ] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
@@ -741,7 +747,18 @@ export default async function Home({
     getBookedCallsByCarrier(rangeParam === "all" ? undefined : Number(rangeParam)),
     getZendeskCsatMonthlyTrend(),
     getZendeskCsatByAgent(),
+    getArchivedSectionKeys(),
   ]);
+
+  const channelBlendArchived = archivedSectionKeys.includes("channel_blend");
+  const channelBlendContent = (
+    <ChannelBlendSection
+      summary={channelBlendSummary}
+      automationStats={channelBlendAutomationStats}
+      uploads={channelBlendUploads}
+      patterns={channelBlendPatterns}
+    />
+  );
 
   const wpStatusOptions = [...new Set(allCampaigns.map((c) => c.status).filter(Boolean))] as string[];
   const keapStatusOptions = [...new Set(allKeapAutomations.map((a) => a.status).filter(Boolean))] as string[];
@@ -878,7 +895,9 @@ export default async function Home({
                 items={[
                   { id: "marketing-keap-automations", label: "Keap Automations", dot: "bg-amber-500" },
                   { id: "marketing-keap-broadcasts", label: "Keap Broadcasts", dot: "bg-sky-500" },
-                  { id: "marketing-channel-blend", label: "Channel Blend", dot: "bg-violet-500" },
+                  ...(channelBlendArchived
+                    ? []
+                    : [{ id: "marketing-channel-blend", label: "Channel Blend", dot: "bg-violet-500" }]),
                   { id: "marketing-woodpecker", label: "Woodpecker", dot: "bg-brand-green" },
                 ]}
               />
@@ -955,14 +974,16 @@ export default async function Home({
                 <KeapBroadcastsList broadcasts={keapBroadcasts} />
               </SectionBlock>
 
-              <SectionBlock id="marketing-channel-blend" title="Channel Blend" accent="border-violet-500">
-                <ChannelBlendSection
-                  summary={channelBlendSummary}
-                  automationStats={channelBlendAutomationStats}
-                  uploads={channelBlendUploads}
-                  patterns={channelBlendPatterns}
-                />
-              </SectionBlock>
+              {!channelBlendArchived && (
+                <SectionBlock
+                  id="marketing-channel-blend"
+                  title="Channel Blend"
+                  accent="border-violet-500"
+                  actions={<SectionArchiveButton sectionKey="channel_blend" label="Channel Blend" archived={false} />}
+                >
+                  {channelBlendContent}
+                </SectionBlock>
+              )}
 
               <GroupDivider label="Automated Performance" />
 
@@ -1113,6 +1134,21 @@ export default async function Home({
                 ]}
               />
             </SectionBlock>
+
+              {channelBlendArchived && (
+                <details className="mb-10 rounded-3xl bg-white p-4 shadow-sm">
+                  <summary className="cursor-pointer text-sm font-semibold text-body-gray">
+                    Archived (1)
+                  </summary>
+                  <div className="mt-4">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <h3 className="font-heading text-lg font-semibold text-charcoal">Channel Blend</h3>
+                      <SectionArchiveButton sectionKey="channel_blend" label="Channel Blend" archived />
+                    </div>
+                    {channelBlendContent}
+                  </div>
+                </details>
+              )}
             </>
           )}
 

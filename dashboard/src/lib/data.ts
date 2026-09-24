@@ -358,6 +358,22 @@ export type KeapBroadcast = {
   category: string;
 };
 
+// Keys of dashboard sections currently archived (see section_archive). Falls
+// back to "nothing archived" if migration 029 hasn't run, so a missing table
+// can never hide a section or crash the page.
+export async function getArchivedSectionKeys(): Promise<string[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("section_archive")
+    .select("section_key")
+    .eq("archived", true);
+  if (error) {
+    console.error("[data] section_archive fetch failed (migration 029 pending?):", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => r.section_key);
+}
+
 export async function getKeapBroadcasts(): Promise<KeapBroadcast[]> {
   const supabase = supabaseServer();
   let { data, error } = await supabase
