@@ -94,8 +94,13 @@ export function BroadcastCard({ broadcast }: { broadcast: BroadcastCardData }) {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-body-gray">
-            {new Date(broadcast.dateSent + "T00:00:00").toLocaleDateString()}
+          <span className="whitespace-nowrap rounded-full bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-700">
+            Sent{" "}
+            {new Date(broadcast.dateSent + "T00:00:00").toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
           </span>
           <button
             onClick={() => setEditing(true)}
