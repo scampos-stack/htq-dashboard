@@ -215,12 +215,16 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
     }
   });
 
-  // The last 1-2 short lines (e.g. "Your friends at Hometown Quotes",
-  // "For agents. By agents.") are the signoff; everything before that,
-  // however many lines, is closing body copy.
+  // The trailing run of short lines is the signoff block; everything before
+  // that, however many lines, is closing body copy. A short signoff can be
+  // more than 2 lines — e.g. "To your success," / "Dr. Paula J. Gregory" /
+  // "Vice President of Customer Success" / "Hometown Quotes | Hometown
+  // University" is 4 — so this grabs the whole contiguous run off the end,
+  // not just the last 2, with a generous cap so a run of short *body* lines
+  // can't be mistaken for the whole signature.
   const remaining = [...trailingLines];
   const signoffCandidates: string[] = [];
-  while (remaining.length > 0 && signoffCandidates.length < 2 && remaining[remaining.length - 1].length <= 60) {
+  while (remaining.length > 0 && signoffCandidates.length < 6 && remaining[remaining.length - 1].length <= 60) {
     signoffCandidates.unshift(remaining.pop()!);
   }
 
@@ -234,7 +238,9 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
     ctaUrl,
     closingParagraphs: remaining,
     signoffLine: signoffCandidates[0] ?? null,
-    signoffSubtext: signoffCandidates[1] ?? null,
+    // Everything after the closer (name, title, org, ...) — the renderer
+    // splits this back into its own lines and bolds the first one.
+    signoffSubtext: signoffCandidates.length > 1 ? signoffCandidates.slice(1).join("\n") : null,
     footerNoteText,
     footerNoteLinkText,
     footerNoteLinkUrl,

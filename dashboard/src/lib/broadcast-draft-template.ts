@@ -66,6 +66,25 @@ ${
 </td></tr></table>`
       : "";
 
+  // signoffSubtext is one line (a tagline, e.g. "For agents. By agents.")
+  // for most drafts, but a signature block ("Dr. Paula J. Gregory" / title /
+  // org) uses several lines. A single line keeps the old small-grey-tagline
+  // look; 2+ lines get the name bolded and colored to match the highlight
+  // box heading, with title/org lines below it in grey.
+  const signoffSubLines = (c.signoffSubtext ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const signoffSubtext =
+    signoffSubLines.length === 0
+      ? ""
+      : signoffSubLines.length === 1
+        ? `<p style="margin:2px 0 0 0;font-size:13px;color:#777777;">${escBold(signoffSubLines[0])}</p>`
+        : signoffSubLines
+            .map((line, i) =>
+              i === 0
+                ? `<p style="margin:2px 0 0 0;font-weight:bold;color:#2F3E1E;">${escBold(line)}</p>`
+                : `<p style="margin:2px 0 0 0;font-size:14px;color:#555555;">${escBold(line)}</p>`
+            )
+            .join("\n");
+
   const footerNote = c.footerNoteText
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:30px 0 0 0;border-top:1px solid #E2E2E2;"><tr>
 <td style="padding:18px 0 0 0;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:1.6;color:#777777;">
@@ -94,7 +113,7 @@ ${ctaButton}
 ${c.closingParagraphs.filter((p) => p.trim()).map((p) => `<p style="margin:0 0 18px 0;">${escBold(p)}</p>`).join("\n")}
 ${footerNote}
 ${c.signoffLine ? `<p style="margin:26px 0 0 0;">${escBold(c.signoffLine)}</p>` : ""}
-${c.signoffSubtext ? `<p style="margin:2px 0 0 0;font-size:13px;color:#777777;">${escBold(c.signoffSubtext)}</p>` : ""}
+${signoffSubtext}
 </td></tr>
 </table>
 </td></tr></table>

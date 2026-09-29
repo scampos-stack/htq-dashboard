@@ -328,9 +328,12 @@ export function BroadcastDraftForm({
           <input value={form.signoffLine} onChange={(e) => set("signoffLine", e.target.value)} className={inputClass} />
         )}
         {field(
-          "Signoff Subtext",
-          <input value={form.signoffSubtext} onChange={(e) => set("signoffSubtext", e.target.value)} className={inputClass} />
+          "Signoff Subtext — one per line (optional)",
+          <textarea value={form.signoffSubtext} onChange={(e) => set("signoffSubtext", e.target.value)} className={`${inputClass} min-h-[70px]`} placeholder={"Dr. Paula J. Gregory\nVice President of Customer Success\nHometown Quotes | Hometown University"} />
         )}
+        <p className="sm:col-span-2 -mt-2 text-[11px] text-body-gray">
+          A single line renders as small grey tagline text (e.g. &quot;For agents. By agents.&quot;). Two or more lines render as a signature block — the first line bold, the rest grey.
+        </p>
         {field(
           "Footer Note (optional)",
           <textarea value={form.footerNoteText} onChange={(e) => set("footerNoteText", e.target.value)} className={`${inputClass} min-h-[70px]`} />,
