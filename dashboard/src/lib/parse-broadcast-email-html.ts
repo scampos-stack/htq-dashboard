@@ -6,6 +6,35 @@ import type { BroadcastDraftContent } from "./broadcast-draft-template";
 // paragraph, optional highlight box / CTA button / footer note tables, then
 // signoff paragraphs). This pre-fills the draft form — it's not meant to be
 // perfect, the user reviews and corrects fields before saving.
+// Walks an element's inline content and re-serializes it to plain text,
+// except bold-ish wrappers (<strong>, <b>, or a <span style="font-weight:
+// bold/600-900">, as Keap/Outlook paste-in HTML uses) become **text**
+// markdown so a bolded lead sentence inside a bullet survives being stored
+// as a plain string. <br> becomes a newline so callers can split on it.
+// renderBroadcastDraftHtml turns the markdown back into a <span> on output.
+function toBoldMarkdown($: cheerio.CheerioAPI, el: unknown): string {
+  let out = "";
+  $(el as never)
+    .contents()
+    .each((_, child) => {
+      if (child.type === "text") {
+        out += $(child).text();
+        return;
+      }
+      if (child.type !== "tag") return;
+      const tag = child.tagName?.toLowerCase();
+      if (tag === "br") {
+        out += "\n";
+        return;
+      }
+      const style = ($(child).attr("style") ?? "").toLowerCase();
+      const isBold = tag === "strong" || tag === "b" || /font-weight:\s*(bold|[6-9]00)/.test(style);
+      const inner = toBoldMarkdown($, child);
+      out += isBold ? `**${inner.trim()}**` : inner;
+    });
+  return out;
+}
+
 export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftContent> {
   const $ = cheerio.load(html);
 
@@ -55,8 +84,14 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
       // separate lines instead of getting jammed into one run-on string.
       const rawHtml = node.html() ?? "";
       const lines = /<br\s*\/?>/i.test(rawHtml)
-        ? rawHtml.split(/<br\s*\/?>/i).map((f) => cheerio.load(`<div>${f}</div>`)("div").text().trim()).filter(Boolean)
-        : [node.text().trim()];
+        ? rawHtml
+            .split(/<br\s*\/?>/i)
+            .map((f) => {
+              const $f = cheerio.load(`<div>${f}</div>`);
+              return toBoldMarkdown($f, $f("div").get(0)).trim();
+            })
+            .filter(Boolean)
+        : [toBoldMarkdown($, el).trim()].filter(Boolean);
       if (lines.length === 0) return;
 
       if (!sawGreeting && /Hi\s+~?Contact\.FirstName~?,?/i.test(lines[0])) {
@@ -90,39 +125,64 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
         footerNoteLinkUrl = noteLink.attr("href") ?? null;
         const cellClone = cell.clone();
         cellClone.find("a").remove();
-        footerNoteText = cellClone.text().trim() || null;
+        footerNoteText = toBoldMarkdown($, cellClone.get(0)).trim() || null;
         sawBlock = true;
         return;
       }
 
-      // Highlight box: three real shapes seen — (a) two separate <div>s
+      // Highlight box: four real shapes seen — (a) two separate <div>s
       // (bold heading div + plain-text body div), (b) one flat <td> with
       // <strong>heading</strong><br> followed by &bull;-prefixed lines
-      // separated by <br>, or (c) a heading <p>/<div> followed by a NESTED
+      // separated by <br>, (c) a heading <p>/<div> followed by a NESTED
       // <table> where each bullet is its own <tr> (a bullet-icon <td> + a
-      // text <td>). (c) needs its own branch — there's no <br> to split on
-      // at all, so the <br>-splitting logic for (b) would just concatenate
-      // the heading and every bullet's text into one run-on string.
+      // text <td>), or (d) each bullet as its own <p> directly in the cell
+      // (no <br>, no nested table — e.g. Paula's Sep 2026 template, where a
+      // bullet's lead sentence is bolded with an inline <span>). (c) and (d)
+      // need their own branches — there's no <br> to split on at all, so
+      // the <br>-splitting logic for (b) would just concatenate the heading
+      // and every bullet's text into one run-on string.
       const divs = node.find("td > div, td > font > div");
       const nestedTable = node.find("td > table");
       const bulletRows = nestedTable.find("tr").filter((_, tr) => $(tr).find("td").length >= 2);
+      const cell = node.find("td").first();
+      const pChildren = cell.children("p");
+      const bulletPrefixedP = pChildren.filter((_, p) => /^[•*\-]/.test($(p).text().trim())).length;
 
       if (divs.length > 1) {
         highlightHeading = divs.first().text().trim() || null;
-        highlightBody = divs.eq(1).text().trim() || null;
+        highlightBody = toBoldMarkdown($, divs.eq(1).get(0)).trim() || null;
       } else if (nestedTable.length > 0 && bulletRows.length > 0) {
         const outerCell = node.find("td").first();
         const headingEl = outerCell.find("> p, > div, > strong, > b").first();
         highlightHeading = headingEl.text().trim() || null;
         highlightBullets = bulletRows
-          .map((_, tr) => $(tr).find("td").last().text().trim())
+          .map((_, tr) => toBoldMarkdown($, $(tr).find("td").last().get(0)).trim())
           .get()
           .filter(Boolean);
+      } else if (pChildren.length > 1 && bulletPrefixedP >= Math.ceil(pChildren.length / 2)) {
+        const bulletLines: string[] = [];
+        const plainLines: string[] = [];
+        pChildren.each((_, p) => {
+          const raw = toBoldMarkdown($, p).trim();
+          const bulletMatch = raw.replace(/\n/g, " ").match(/^[•*\-]\s*(.+)$/);
+          if (bulletMatch) bulletLines.push(bulletMatch[1].trim());
+          else if (raw) plainLines.push(raw);
+        });
+        if (bulletLines.length > 0) {
+          highlightBullets = bulletLines;
+          if (!highlightHeading && plainLines.length > 0 && plainLines[0].endsWith(":")) {
+            highlightHeading = plainLines.shift() ?? null;
+          }
+        } else if (plainLines.length > 0) {
+          highlightBody = plainLines.join(" ");
+        }
       } else {
-        const cell = node.find("td").first();
         const lines = (cell.html() ?? "")
           .split(/<br\s*\/?>/i)
-          .map((fragment) => cheerio.load(`<div>${fragment}</div>`)("div").text().trim())
+          .map((fragment) => {
+            const $f = cheerio.load(`<div>${fragment}</div>`);
+            return toBoldMarkdown($f, $f("div").get(0)).trim();
+          })
           .filter(Boolean);
 
         const bulletLines: string[] = [];
@@ -131,7 +191,7 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
           const isHeadingTag = /^<(strong|b)>/i.test(cell.html() ?? "") && lines.indexOf(line) === 0;
           const bulletMatch = line.match(/^[•*\-]\s*(.+)$/);
           if (isHeadingTag && !highlightHeading) {
-            highlightHeading = line;
+            highlightHeading = line.replace(/^\*\*([^*]+)\*\*$/, "$1");
           } else if (bulletMatch) {
             bulletLines.push(bulletMatch[1].trim());
           } else {

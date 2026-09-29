@@ -308,6 +308,7 @@ export function BroadcastDraftForm({
         )}
         <p className="sm:col-span-2 -mt-2 text-[11px] text-body-gray">
           Use Body for a short paragraph-style highlight, or Bullets for a recap list — not usually both. Bullets take priority if both are filled in.
+          Wrap text in <code>**double asterisks**</code> to bold part of a line, e.g. <code>**Speed matters.** Online shoppers ask several places at once.</code>
         </p>
         {field(
           "CTA Button Text",

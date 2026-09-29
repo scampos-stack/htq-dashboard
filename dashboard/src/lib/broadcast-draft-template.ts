@@ -18,6 +18,21 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// User-entered text may contain **bold** markdown (typed by hand, or round
+// -tripped from parseBroadcastEmailHtml's toBoldMarkdown) — turn it into the
+// same bold span style the real Keap template uses, escaping everything
+// else. Plain esc() stays for fields that must never contain markup, like
+// ctaUrl.
+function escBold(s: string): string {
+  return s
+    .split(/(\*\*[^*]+\*\*)/g)
+    .map((part) => {
+      const m = part.match(/^\*\*([^*]+)\*\*$/);
+      return m ? `<span style="font-weight:bold;color:#2F3E1E;">${esc(m[1])}</span>` : esc(part);
+    })
+    .join("");
+}
+
 // Matches the real send template's shell (logo header, green rule, body
 // copy, optional highlight box, CTA button, optional footer note, signoff)
 // so every draft previews exactly like what will actually go out — swap
@@ -35,9 +50,9 @@ export function renderBroadcastDraftHtml(c: BroadcastDraftContent): string {
 ${c.highlightHeading ? `<div style="font-size:16px;font-weight:bold;color:#2F3E1E;padding-bottom:8px;">${esc(c.highlightHeading)}</div>` : ""}
 ${
   highlightBullets.length > 0
-    ? `<div style="font-size:15px;line-height:1.6;color:#333333;">${highlightBullets.map((b) => `&bull;&nbsp; ${esc(b)}`).join("<br>\n")}</div>`
+    ? `<div style="font-size:15px;line-height:1.6;color:#333333;">${highlightBullets.map((b) => `&bull;&nbsp; ${escBold(b)}`).join("<br>\n")}</div>`
     : c.highlightBody
-      ? `<div style="font-size:15px;line-height:1.6;color:#333333;">${esc(c.highlightBody)}</div>`
+      ? `<div style="font-size:15px;line-height:1.6;color:#333333;">${escBold(c.highlightBody)}</div>`
       : ""
 }
 </td></tr></table>`
@@ -54,7 +69,7 @@ ${
   const footerNote = c.footerNoteText
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:30px 0 0 0;border-top:1px solid #E2E2E2;"><tr>
 <td style="padding:18px 0 0 0;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:1.6;color:#777777;">
-${esc(c.footerNoteText)}
+${escBold(c.footerNoteText)}
 ${c.footerNoteLinkText && c.footerNoteLinkUrl ? ` <a href="${esc(c.footerNoteLinkUrl)}" style="color:#5B9E31;font-weight:bold;text-decoration:underline;">${esc(c.footerNoteLinkText)}</a>` : ""}
 </td></tr></table>`
     : "";
@@ -73,13 +88,13 @@ ${c.footerNoteLinkText && c.footerNoteLinkUrl ? ` <a href="${esc(c.footerNoteLin
 </td></tr>
 <tr><td style="padding:34px 40px 30px 40px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#333333;">
 <p style="margin:0 0 18px 0;">Hi ~Contact.FirstName~,</p>
-${c.introParagraphs.map((p) => `<p style="margin:0 0 18px 0;">${esc(p)}</p>`).join("\n")}
+${c.introParagraphs.map((p) => `<p style="margin:0 0 18px 0;">${escBold(p)}</p>`).join("\n")}
 ${highlightBox}
 ${ctaButton}
-${c.closingParagraphs.filter((p) => p.trim()).map((p) => `<p style="margin:0 0 18px 0;">${esc(p)}</p>`).join("\n")}
+${c.closingParagraphs.filter((p) => p.trim()).map((p) => `<p style="margin:0 0 18px 0;">${escBold(p)}</p>`).join("\n")}
 ${footerNote}
-${c.signoffLine ? `<p style="margin:26px 0 0 0;">${esc(c.signoffLine)}</p>` : ""}
-${c.signoffSubtext ? `<p style="margin:2px 0 0 0;font-size:13px;color:#777777;">${esc(c.signoffSubtext)}</p>` : ""}
+${c.signoffLine ? `<p style="margin:26px 0 0 0;">${escBold(c.signoffLine)}</p>` : ""}
+${c.signoffSubtext ? `<p style="margin:2px 0 0 0;font-size:13px;color:#777777;">${escBold(c.signoffSubtext)}</p>` : ""}
 </td></tr>
 </table>
 </td></tr></table>
