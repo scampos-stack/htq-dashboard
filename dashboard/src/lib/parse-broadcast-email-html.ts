@@ -12,6 +12,10 @@ import type { BroadcastDraftContent } from "./broadcast-draft-template";
 // markdown so a bolded lead sentence inside a bullet survives being stored
 // as a plain string. <br> becomes a newline so callers can split on it.
 // renderBroadcastDraftHtml turns the markdown back into a <span> on output.
+function isBoldStyle(style: string): boolean {
+  return /font-weight:\s*(bold|[6-9]00)/.test(style.toLowerCase());
+}
+
 function toBoldMarkdown($: cheerio.CheerioAPI, el: unknown): string {
   let out = "";
   $(el as never)
@@ -27,12 +31,26 @@ function toBoldMarkdown($: cheerio.CheerioAPI, el: unknown): string {
         out += "\n";
         return;
       }
-      const style = ($(child).attr("style") ?? "").toLowerCase();
-      const isBold = tag === "strong" || tag === "b" || /font-weight:\s*(bold|[6-9]00)/.test(style);
+      const isBold = tag === "strong" || tag === "b" || isBoldStyle($(child).attr("style") ?? "");
       const inner = toBoldMarkdown($, child);
       out += isBold ? `**${inner.trim()}**` : inner;
     });
   return out;
+}
+
+// Same as toBoldMarkdown, but also checks the passed-in element's OWN style
+// — not just its descendants' — for font-weight:bold. Needed for markup
+// like <p style="font-weight:bold;color:#2F3E1E;">Dr. Paula J. Gregory</p>,
+// where the whole line is bold via the block element's own style rather
+// than a <strong>/<b>/<span> wrapping part of it (toBoldMarkdown alone
+// only ever sees that on a *child* of the element it's called with).
+function elementToBoldMarkdown($: cheerio.CheerioAPI, el: unknown): string {
+  const node = $(el as never);
+  const tag = (el as { tagName?: string })?.tagName?.toLowerCase();
+  const inner = toBoldMarkdown($, el).trim();
+  const isBold = tag === "strong" || tag === "b" || isBoldStyle(node.attr("style") ?? "");
+  if (!isBold || inner === "" || /^\*\*[\s\S]*\*\*$/.test(inner)) return inner;
+  return `**${inner}**`;
 }
 
 export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftContent> {
@@ -82,16 +100,23 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
       // A signoff like "Talk soon,<br>The Hometown Quotes Team" is one <p>
       // with an embedded <br> — split on it so both halves survive as
       // separate lines instead of getting jammed into one run-on string.
+      // A bold signature name is sometimes the whole <p>'s own style (e.g.
+      // <p style="font-weight:bold;...">Dr. Paula J. Gregory</p>) rather
+      // than a <strong>/<span> inside it — that style is lost once we split
+      // into <br> fragments, so carry it forward explicitly for that case.
+      const pIsBold = isBoldStyle(node.attr("style") ?? "");
       const rawHtml = node.html() ?? "";
       const lines = /<br\s*\/?>/i.test(rawHtml)
         ? rawHtml
             .split(/<br\s*\/?>/i)
             .map((f) => {
               const $f = cheerio.load(`<div>${f}</div>`);
-              return toBoldMarkdown($f, $f("div").get(0)).trim();
+              const text = toBoldMarkdown($f, $f("div").get(0)).trim();
+              if (!text) return "";
+              return pIsBold && !/^\*\*[\s\S]*\*\*$/.test(text) ? `**${text}**` : text;
             })
             .filter(Boolean)
-        : [toBoldMarkdown($, el).trim()].filter(Boolean);
+        : [elementToBoldMarkdown($, el)].filter(Boolean);
       if (lines.length === 0) return;
 
       if (!sawGreeting && /Hi\s+~?Contact\.FirstName~?,?/i.test(lines[0])) {
@@ -125,7 +150,7 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
         footerNoteLinkUrl = noteLink.attr("href") ?? null;
         const cellClone = cell.clone();
         cellClone.find("a").remove();
-        footerNoteText = toBoldMarkdown($, cellClone.get(0)).trim() || null;
+        footerNoteText = elementToBoldMarkdown($, cellClone.get(0)) || null;
         sawBlock = true;
         return;
       }
@@ -150,19 +175,25 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
 
       if (divs.length > 1) {
         highlightHeading = divs.first().text().trim() || null;
-        highlightBody = toBoldMarkdown($, divs.eq(1).get(0)).trim() || null;
+        highlightBody = elementToBoldMarkdown($, divs.eq(1).get(0)) || null;
       } else if (nestedTable.length > 0 && bulletRows.length > 0) {
         const outerCell = node.find("td").first();
         const headingEl = outerCell.find("> p, > div, > strong, > b").first();
         highlightHeading = headingEl.text().trim() || null;
         highlightBullets = bulletRows
-          .map((_, tr) => toBoldMarkdown($, $(tr).find("td").last().get(0)).trim())
+          .map((_, tr) => elementToBoldMarkdown($, $(tr).find("td").last().get(0)))
           .get()
           .filter(Boolean);
       } else if (pChildren.length > 1 && bulletPrefixedP >= Math.ceil(pChildren.length / 2)) {
         const bulletLines: string[] = [];
         const plainLines: string[] = [];
         pChildren.each((_, p) => {
+          // toBoldMarkdown, not elementToBoldMarkdown — a bullet <p> that's
+          // bold at the block level would wrap the leading &bull; marker
+          // in ** too, and the bullet-prefix regex below reads a leading
+          // "*" as a bullet marker itself. Real templates only ever bold
+          // part of a bullet's text via an inline span, never the <p>
+          // (and the bullet char) as a whole, so this stays scoped to that.
           const raw = toBoldMarkdown($, p).trim();
           const bulletMatch = raw.replace(/\n/g, " ").match(/^[•*\-]\s*(.+)$/);
           if (bulletMatch) bulletLines.push(bulletMatch[1].trim());

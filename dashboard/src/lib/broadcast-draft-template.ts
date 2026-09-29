@@ -111,9 +111,9 @@ ${c.introParagraphs.map((p) => `<p style="margin:0 0 18px 0;">${escBold(p)}</p>`
 ${highlightBox}
 ${ctaButton}
 ${c.closingParagraphs.filter((p) => p.trim()).map((p) => `<p style="margin:0 0 18px 0;">${escBold(p)}</p>`).join("\n")}
-${footerNote}
 ${c.signoffLine ? `<p style="margin:26px 0 0 0;">${escBold(c.signoffLine)}</p>` : ""}
 ${signoffSubtext}
+${footerNote}
 </td></tr>
 </table>
 </td></tr></table>
