@@ -206,6 +206,15 @@ export function BroadcastDraftDetail({
             {" · v"}
             {draft.version}
           </p>
+          {draft.loggedBroadcastId && (
+            <p className="mt-1 text-xs text-body-gray">
+              Auto-logged to the{" "}
+              <a href="/?arrangement=marketing#marketing-keap-broadcasts" className="underline">
+                Keap Broadcasts log
+              </a>{" "}
+              — add the real delivered / opens / clicks once Keap reports them.
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <button

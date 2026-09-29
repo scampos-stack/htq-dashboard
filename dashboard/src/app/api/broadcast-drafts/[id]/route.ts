@@ -45,6 +45,46 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const supabase = supabaseServer();
 
+    // Marking a draft "Sent" logs it in the Keap Broadcasts log automatically
+    // — one less manual step, and it's how the log used to get missed. Keap
+    // itself doesn't report delivered/opens/clicks to us, so this logs a
+    // placeholder (0s) that still needs the real numbers pasted in from
+    // Keap's broadcast stats screen, same as the manual "+ Log broadcast"
+    // flow always has. Guarded by logged_broadcast_id so re-saving "sent"
+    // (or toggling away and back) never creates a second log row.
+    if (update.status === "sent") {
+      const { data: draft, error: draftErr } = await supabase
+        .from("broadcast_drafts")
+        .select("campaign_theme, target_date, list_segment, logged_broadcast_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (draftErr) {
+        console.error("[broadcast-draft patch] couldn't read draft for auto-log:", draftErr.message);
+      } else if (draft && !draft.logged_broadcast_id && draft.campaign_theme) {
+        const CARRIERS = new Set(["Farmers", "Allstate", "Independent", "State Farm"]);
+        const carrier = [...CARRIERS].find((c) => draft.list_segment?.includes(c)) ?? "General";
+        const { data: logged, error: logErr } = await supabase
+          .from("keap_broadcasts")
+          .insert({
+            campaign_name: `${draft.campaign_theme} (${draft.list_segment})`,
+            date_sent: draft.target_date ?? new Date().toISOString().slice(0, 10),
+            emails_delivered: 0,
+            opens: 0,
+            clicks: 0,
+            replies: 0,
+            carrier,
+            category: "sales_marketing",
+          })
+          .select("id")
+          .single();
+        if (logErr) {
+          console.error("[broadcast-draft patch] auto-log insert failed:", logErr.message);
+        } else if (logged) {
+          update.logged_broadcast_id = logged.id;
+        }
+      }
+    }
+
     // Only fires when assignedTo is actually changing to a new real person
     // — not on every save of a form that always includes the field, and
     // not on unassigning.
