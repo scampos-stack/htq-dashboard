@@ -58,19 +58,30 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
 
   const preheader = $('div[style*="display:none"]').first().text().trim() || null;
 
-  // The content <td> is the one whose padding matches the template's body
-  // cell (34px top) — distinguishes it from the header <td> (which has the
-  // logo) and the outer wrapper <td>s.
-  let contentTd = $("td").filter((_, el) => /padding:\s*34px/.test($(el).attr("style") ?? "")).first();
-  if (contentTd.length === 0) {
-    // Fallback: the <td> that directly contains the greeting paragraph.
-    contentTd = $("p")
-      .filter((_, el) => /Hi\s+~?Contact\.FirstName~?,?/i.test($(el).text()))
-      .first()
-      .parent("td");
-  }
-  if (contentTd.length === 0) {
-    return { preheader };
+  // Two real layouts seen: (1) one content <td> holds everything — greeting,
+  // body, highlight box, CTA, signature, footer — as a flat list of
+  // children, or (2) each section is its own <tr><td> in the main 600px
+  // table (e.g. a "Signature" row, a "Footer" row), with the greeting only
+  // sharing a <td> with the first couple of intro paragraphs. closest
+  // ("table") on the greeting finds that main table either way — for (1)
+  // it's the table whose lone row *is* the content td; for (2) it's the
+  // table that directly contains every section's row — so walking its rows
+  // generalizes both: (1) is just the one-row case of the same loop.
+  const greetingP = $("p")
+    .filter((_, el) => /Hi\s+~?Contact\.FirstName~?,?/i.test($(el).text()))
+    .first();
+  const contentTable = greetingP.closest("table");
+  // Direct child <td>s of that table, in document order, skipping a <tbody>
+  // wrapper if the parser inserted one — e.g. [logo td, body td, callout
+  // td, cta td, signature td, footer td] for layout (2) above, or just
+  // [content td] for layout (1).
+  let contentCells = contentTable.find("> tbody > tr > td");
+  if (contentCells.length === 0) contentCells = contentTable.find("> tr > td");
+  if (contentCells.length === 0) {
+    // Fallback for a greeting that isn't inside any <table> at all.
+    const contentTd = greetingP.parent("td");
+    if (contentTd.length === 0) return { preheader };
+    contentCells = contentTd;
   }
 
   const introParagraphs: string[] = [];
@@ -92,11 +103,17 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
   let sawGreeting = false;
   let sawBlock = false; // true once we've passed the first table block (highlight or CTA)
 
-  contentTd.children().each((_, el) => {
-    const node = $(el);
-    const tag = el.tagName?.toLowerCase();
+  contentCells.each((_, cellEl) => {
+    let cellMatchedPorTable = false;
 
-    if (tag === "p") {
+    $(cellEl)
+      .children()
+      .each((_, el) => {
+        const node = $(el);
+        const tag = el.tagName?.toLowerCase();
+        if (tag === "p" || tag === "table") cellMatchedPorTable = true;
+
+        if (tag === "p") {
       // A signoff like "Talk soon,<br>The Hometown Quotes Team" is one <p>
       // with an embedded <br> — split on it so both halves survive as
       // separate lines instead of getting jammed into one run-on string.
@@ -207,6 +224,24 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
         } else if (plainLines.length > 0) {
           highlightBody = plainLines.join(" ");
         }
+      } else if (pChildren.length >= 1) {
+        // (e) heading <p> + plain body <p>(s), no bullets, no <br> at all —
+        // e.g. a callout with just "Who you'll be working with" then a
+        // paragraph. There's nothing to split on, so read each <p> on its
+        // own instead of the <br>-splitting fallback below (which would
+        // otherwise glue every paragraph into one run-on string).
+        const texts = pChildren
+          .map((_, p) => elementToBoldMarkdown($, p))
+          .get()
+          .filter(Boolean);
+        let bodyTexts = texts;
+        const first = texts[0] ?? "";
+        const firstIsHeading = (/^\*\*[\s\S]*\*\*$/.test(first) || first.trim().endsWith(":")) && texts.length > 1;
+        if (firstIsHeading) {
+          highlightHeading = first.replace(/^\*\*([^*]+)\*\*$/, "$1");
+          bodyTexts = texts.slice(1);
+        }
+        if (bodyTexts.length > 0) highlightBody = bodyTexts.join(" ");
       } else {
         const lines = (cell.html() ?? "")
           .split(/<br\s*\/?>/i)
@@ -243,6 +278,27 @@ export function parseBroadcastEmailHtml(html: string): Partial<BroadcastDraftCon
       }
       sawBlock = true;
       return;
+    }
+      });
+
+    // A cell whose content is just loose text/links directly in the <td>
+    // (no <p>, no <table>) — e.g. a dark-background footer row with
+    // "Hometown Quotes · For Agents, By Agents<br><a>hometownquotes.com</a>"
+    // straight in the cell, not wrapped in a bordered footer table like the
+    // other templates. Only once we're past the greeting, so the logo
+    // header row (also p/table-free) is never mistaken for this.
+    if (!cellMatchedPorTable && sawGreeting) {
+      const cell = $(cellEl);
+      const link = cell.find("a").first();
+      const clone = cell.clone();
+      clone.find("a").remove();
+      const text = elementToBoldMarkdown($, clone.get(0));
+      if (text) {
+        footerNoteText = text;
+        footerNoteLinkText = link.text().trim() || null;
+        footerNoteLinkUrl = link.attr("href") ?? null;
+        sawBlock = true;
+      }
     }
   });
 
