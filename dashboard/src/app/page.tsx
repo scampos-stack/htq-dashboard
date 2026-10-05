@@ -417,11 +417,31 @@ function KeapAutomationsList({
   );
 }
 
+// A campaign sent to several lists (e.g. "Leads that land in your CRM, not
+// just your inbox" to Country Financial, Farmers, and Allstate) gets logged
+// as one row per list, with the list named in parens on the campaign name.
+// Groups those back into one cluster per theme — stripping the trailing
+// "(list)" — so they read together instead of as unrelated rows, with
+// groups and the sends within each group both oldest-to-newest.
+function groupKeapBroadcasts(broadcasts: Awaited<ReturnType<typeof getKeapBroadcasts>>) {
+  const groups = new Map<string, { theme: string; earliestDate: string; items: typeof broadcasts }>();
+  for (const b of broadcasts) {
+    const theme = b.campaignName.replace(/\s*\([^()]+\)\s*$/, "").trim() || b.campaignName;
+    const g = groups.get(theme) ?? { theme, earliestDate: b.dateSent, items: [] };
+    if (b.dateSent < g.earliestDate) g.earliestDate = b.dateSent;
+    g.items.push(b);
+    groups.set(theme, g);
+  }
+  for (const g of groups.values()) g.items.sort((a, b) => a.dateSent.localeCompare(b.dateSent));
+  return [...groups.values()].sort((a, b) => a.earliestDate.localeCompare(b.earliestDate));
+}
+
 function KeapBroadcastsList({
   broadcasts,
 }: {
   broadcasts: Awaited<ReturnType<typeof getKeapBroadcasts>>;
 }) {
+  const groups = groupKeapBroadcasts(broadcasts);
   return (
     <div>
       <div className="mb-4 flex justify-end">
@@ -433,9 +453,18 @@ function KeapBroadcastsList({
           broadcast performance, so add them here manually.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          {broadcasts.map((b) => (
-            <BroadcastCard key={b.id} broadcast={b} />
+        <div className="flex flex-col gap-6">
+          {groups.map((g) => (
+            <div key={g.theme}>
+              {g.items.length > 1 && (
+                <h3 className="mb-2 font-heading text-sm font-semibold text-body-gray">{g.theme}</h3>
+              )}
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                {g.items.map((b) => (
+                  <BroadcastCard key={b.id} broadcast={b} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
