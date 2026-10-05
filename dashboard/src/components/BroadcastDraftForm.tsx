@@ -122,21 +122,20 @@ export function BroadcastDraftForm({
   const [saving, setSaving] = useState(false);
   const [parsingHtml, setParsingHtml] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [showPasteBox, setShowPasteBox] = useState(false);
+  const [pastedHtml, setPastedHtml] = useState("");
 
   function set<K extends keyof BroadcastDraftFormValues>(key: K, value: BroadcastDraftFormValues[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  // Parses the uploaded file into content fields and pre-fills the form —
-  // doesn't save anything, so the user reviews/corrects before submitting.
-  async function handleUploadHtml(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  // Parses HTML (from an uploaded file or pasted straight into the box
+  // below) into content fields and pre-fills the form — doesn't save
+  // anything, so the user reviews/corrects before submitting.
+  async function parseAndFillHtml(html: string) {
     setParsingHtml(true);
     setParseError(null);
     try {
-      const html = await file.text();
       const res = await fetch("/api/broadcast-drafts/parse-html", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -161,10 +160,31 @@ export function BroadcastDraftForm({
         footerNoteLinkText: c.footerNoteLinkText ?? f.footerNoteLinkText,
         footerNoteLinkUrl: c.footerNoteLinkUrl ?? f.footerNoteLinkUrl,
       }));
+      return true;
     } catch (err) {
       setParseError(err instanceof Error ? err.message : "Failed to parse HTML");
+      return false;
     } finally {
       setParsingHtml(false);
+    }
+  }
+
+  async function handleUploadHtml(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    await parseAndFillHtml(await file.text());
+  }
+
+  async function handleParsePastedHtml() {
+    if (!pastedHtml.trim()) {
+      setParseError("Paste the email's HTML first.");
+      return;
+    }
+    const ok = await parseAndFillHtml(pastedHtml);
+    if (ok) {
+      setPastedHtml("");
+      setShowPasteBox(false);
     }
   }
 
@@ -269,13 +289,44 @@ export function BroadcastDraftForm({
         )}
       </div>
 
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <h4 className="text-xs font-bold uppercase tracking-wide text-body-gray">Email Content</h4>
-        <label className="cursor-pointer rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5">
-          {parsingHtml ? "Reading…" : "Upload HTML"}
-          <input type="file" accept=".html,.htm,text/html" onChange={handleUploadHtml} className="hidden" disabled={parsingHtml} />
-        </label>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowPasteBox((v) => !v)}
+            disabled={parsingHtml}
+            className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5 disabled:opacity-50"
+          >
+            {showPasteBox ? "Cancel Paste" : "Paste HTML"}
+          </button>
+          <label className="cursor-pointer rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5">
+            {parsingHtml ? "Reading…" : "Upload HTML"}
+            <input type="file" accept=".html,.htm,text/html" onChange={handleUploadHtml} className="hidden" disabled={parsingHtml} />
+          </label>
+        </div>
       </div>
+      {showPasteBox && (
+        <div className="mb-4 rounded-2xl border border-black/10 bg-charcoal/[0.02] p-3">
+          <textarea
+            value={pastedHtml}
+            onChange={(e) => setPastedHtml(e.target.value)}
+            placeholder="Paste the full email HTML here (View email → copy source, or the HTML you're sending to Keap)."
+            className={`${inputClass} min-h-[140px] font-mono text-xs`}
+            disabled={parsingHtml}
+          />
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={handleParsePastedHtml}
+              disabled={parsingHtml}
+              className="rounded-full bg-charcoal px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              {parsingHtml ? "Parsing…" : "Parse Pasted HTML"}
+            </button>
+          </div>
+        </div>
+      )}
       {parseError && <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{parseError}</div>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {field(
