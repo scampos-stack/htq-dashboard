@@ -85,10 +85,16 @@ ${
             )
             .join("\n");
 
+  // footerNoteText can carry an embedded newline (a <br> in the source
+  // footer, e.g. "Hometown Quotes" / "FOR AGENTS. BY AGENTS." as two
+  // lines — parseBroadcastEmailHtml's toBoldMarkdown turns a source <br>
+  // into "\n"). A literal "\n" collapses to nothing in rendered HTML, so
+  // without converting it to a real <br> here, both lines — and the link
+  // appended right after — run together on one crammed line.
   const footerNote = c.footerNoteText
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:30px 0 0 0;border-top:1px solid #E2E2E2;"><tr>
 <td style="padding:18px 0 0 0;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:1.6;color:#777777;">
-${escBold(c.footerNoteText)}
+${escBold(c.footerNoteText).replace(/\n/g, "<br>\n")}
 ${c.footerNoteLinkText && c.footerNoteLinkUrl ? ` <a href="${esc(c.footerNoteLinkUrl)}" style="color:#5B9E31;font-weight:bold;text-decoration:underline;">${esc(c.footerNoteLinkText)}</a>` : ""}
 </td></tr></table>`
     : "";
