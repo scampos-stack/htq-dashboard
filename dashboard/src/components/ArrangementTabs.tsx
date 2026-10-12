@@ -12,14 +12,21 @@ const ARRANGEMENTS = [
   { value: "support", label: "Support", dot: "bg-teal-500" },
 ];
 
-export function ArrangementTabs() {
+// Saved custom views (see DashboardViewsManager) show up as extra pills
+// after the fixed arrangements, with value "view-<id>" — same mechanism,
+// just a dynamic list instead of a fixed one.
+export function ArrangementTabs({ views = [] }: { views?: { id: number; name: string }[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const current = searchParams.get("arrangement") ?? "overview";
+  const allTabs = [
+    ...ARRANGEMENTS,
+    ...views.map((v) => ({ value: `view-${v.id}`, label: v.name, dot: "bg-violet-500" })),
+  ];
 
   return (
     <nav className="flex flex-wrap gap-2">
-      {ARRANGEMENTS.map((a) => {
+      {allTabs.map((a) => {
         const active = current === a.value;
         return (
           <button

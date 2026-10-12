@@ -1784,3 +1784,30 @@ export async function getAllSourcesDigest(): Promise<AllSourcesDigest> {
   if (!data) return null;
   return { summary: data.summary, generatedAt: data.generated_at };
 }
+
+export type DashboardView = {
+  id: number;
+  name: string;
+  widgetIds: string[];
+  createdBy: string | null;
+  updatedAt: string;
+};
+
+export async function getDashboardViews(): Promise<DashboardView[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("dashboard_views")
+    .select("id, name, widget_ids, created_by, updated_at")
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error("[data] dashboard_views fetch failed (migration 032 pending?):", error.message);
+    return [];
+  }
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    widgetIds: Array.isArray(r.widget_ids) ? r.widget_ids : [],
+    createdBy: r.created_by,
+    updatedAt: r.updated_at,
+  }));
+}

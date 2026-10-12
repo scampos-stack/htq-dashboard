@@ -21,6 +21,7 @@ import {
   getJustCallSummary,
   getZendeskTopicsSummary,
   getAllSourcesDigest,
+  getDashboardViews,
   getDailyVolumeTrend,
   getKeapAutomationEventVolume,
   getWoodpeckerAiSummary,
@@ -57,6 +58,10 @@ import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { KeapBroadcastsTable } from "@/components/KeapBroadcastsTable";
 import { VipSubmissionsTable } from "@/components/VipSubmissionsTable";
+import { CsatMonthlyTrendChart } from "@/components/CsatMonthlyTrendChart";
+import { CsatByAgentTable } from "@/components/CsatByAgentTable";
+import { DashboardViewDragList } from "@/components/DashboardViewDragList";
+import { DashboardViewsManager } from "@/components/DashboardViewsManager";
 import { DispositionRow } from "@/components/DispositionRow";
 import { ExecutiveSummaryCard } from "@/components/ExecutiveSummaryCard";
 import { SentimentBreakdown } from "@/components/SentimentBreakdown";
@@ -578,6 +583,59 @@ function VipSubmissionsWidget({
   return <VipSubmissionsTable submissions={submissions} />;
 }
 
+const WEBHOOK_SOURCE_LABELS: Record<string, string> = {
+  microsoft_link: "Microsoft Link (self-booked)",
+  agent_call_in: "Agent Call-In",
+};
+
+function BookedCallsSummary({
+  rangeParam,
+  channelBlendAppointmentsCount,
+  webhookBookedCallsBySource,
+  bookedCallsByCarrier,
+}: {
+  rangeParam: string;
+  channelBlendAppointmentsCount: number;
+  webhookBookedCallsBySource: Awaited<ReturnType<typeof getWebhookBookedCallsBySource>>;
+  bookedCallsByCarrier: Awaited<ReturnType<typeof getBookedCallsByCarrier>>;
+}) {
+  const rangeLabel = rangeParam === "all" ? "all time" : `the last ${rangeParam} days`;
+  const bookedCallsBySource = [
+    { label: "Channel Blend", count: channelBlendAppointmentsCount },
+    ...webhookBookedCallsBySource.map((r) => ({
+      label: WEBHOOK_SOURCE_LABELS[r.source] ?? r.source,
+      count: r.count,
+    })),
+  ];
+  const totalBookedCalls = bookedCallsBySource.reduce((sum, r) => sum + r.count, 0);
+  return (
+    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="flex flex-col justify-center rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
+        <Metric label="Total Booked Calls" value={totalBookedCalls.toLocaleString()} />
+        <p className="mt-2 text-xs text-body-gray">
+          15-minute HTQ Discovery calls booked in {rangeLabel}, across both sources.
+        </p>
+        {bookedCallsByCarrier.length > 0 && (
+          <p className="mt-3 text-xs text-body-gray">
+            Top carrier:{" "}
+            <span className="font-semibold text-charcoal">{bookedCallsByCarrier[0].carrier}</span>{" "}
+            ({bookedCallsByCarrier[0].count.toLocaleString()})
+          </p>
+        )}
+      </div>
+      <DonutChart
+        title="Booked Calls by Source"
+        segments={bookedCallsBySource.map((r) => ({ label: r.label, value: r.count }))}
+      />
+      <HorizontalBarList
+        title="Booked Calls by Carrier"
+        accent="bg-violet-500"
+        rows={bookedCallsByCarrier.map((r) => ({ label: r.carrier, count: r.count }))}
+      />
+    </div>
+  );
+}
+
 export default async function Home({
   searchParams,
 }: PageProps<"/">) {
@@ -683,6 +741,7 @@ export default async function Home({
     csatMonthlyTrend,
     csatByAgent,
     archivedSectionKeys,
+    dashboardViews,
   ] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
@@ -715,6 +774,7 @@ export default async function Home({
     getZendeskCsatMonthlyTrend(),
     getZendeskCsatByAgent(),
     getArchivedSectionKeys(),
+    getDashboardViews(),
   ]);
 
   const channelBlendArchived = archivedSectionKeys.includes("channel_blend");
@@ -742,15 +802,66 @@ export default async function Home({
   const showOverview = arrangementParam === "overview";
   const showMarketing = arrangementParam === "marketing";
   const showSupport = arrangementParam === "support";
+  const customView = arrangementParam.startsWith("view-")
+    ? dashboardViews.find((v) => `view-${v.id}` === arrangementParam) ?? null
+    : null;
+
+  // Renders one widget from the catalog (src/lib/dashboard-widgets.ts) for a
+  // Custom View, reusing the exact components the normal tabs render — the
+  // data for every widget is already fetched above regardless of which tab
+  // is showing, so no extra fetching is needed here.
+  function renderWidget(id: string) {
+    switch (id) {
+      case "overview.sourceMixDonut":
+        return (
+          <DonutChart
+            title="Source Mix (Sent)"
+            segments={sourceSummary.filter((r) => r.connected).map((r) => ({ label: r.label, value: r.sent }))}
+          />
+        );
+      case "overview.byCarrier":
+        return (
+          <div>
+            <h3 className="mb-3 font-heading text-base font-semibold text-charcoal">By Carrier</h3>
+            <CarrierSummaryTable rows={carrierSummary} />
+          </div>
+        );
+      case "overview.vipSubmissions":
+        return <VipSubmissionsWidget submissions={vipSubmissions} />;
+      case "overview.sourceSummaryTable":
+        return <SourceSummaryTable rows={sourceSummary} />;
+      case "overview.allSourcesDigest":
+        return <AllSourcesDigestCard digest={allSourcesDigest} />;
+      case "overview.bookedCalls":
+        return (
+          <BookedCallsSummary
+            rangeParam={rangeParam}
+            channelBlendAppointmentsCount={channelBlendAppointmentsCount}
+            webhookBookedCallsBySource={webhookBookedCallsBySource}
+            bookedCallsByCarrier={bookedCallsByCarrier}
+          />
+        );
+      case "marketing.keapBroadcastsLog":
+        return <KeapBroadcastsTable broadcasts={keapBroadcasts} />;
+      case "marketing.channelBlendPatterns":
+        return <ChannelBlendPatternsCard patterns={channelBlendPatterns} />;
+      case "support.zendeskCsatTrend":
+        return <CsatMonthlyTrendChart points={csatMonthlyTrend} year={new Date().getFullYear()} />;
+      case "support.zendeskCsatByAgent":
+        return <CsatByAgentTable rows={csatByAgent} />;
+      default:
+        return null;
+    }
+  }
 
   return (
     <div className="flex-1 bg-mist">
       <DashboardHeader active="client" />
 
       <div className="mx-auto max-w-screen-2xl px-6 py-10 sm:px-10">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Suspense fallback={null}>
-            <ArrangementTabs />
+            <ArrangementTabs views={dashboardViews.map((v) => ({ id: v.id, name: v.name }))} />
           </Suspense>
           <Link
             href="/broadcast-drafts"
@@ -760,7 +871,18 @@ export default async function Home({
           </Link>
         </div>
 
+        <div className="mb-8">
+          <DashboardViewsManager views={dashboardViews} />
+        </div>
+
         <main className="min-w-0">
+          {customView && (
+            <DashboardViewDragList viewId={customView.id} initialOrder={customView.widgetIds}>
+              {customView.widgetIds.map((id) => (
+                <div key={id}>{renderWidget(id)}</div>
+              ))}
+            </DashboardViewDragList>
+          )}
           {showOverview && (
             <>
               <JumpNav
@@ -788,49 +910,12 @@ export default async function Home({
                     <RangeSelect />
                   </Suspense>
                 </div>
-                {(() => {
-                  const rangeLabel = rangeParam === "all" ? "all time" : `the last ${rangeParam} days`;
-                  const webhookSourceLabels: Record<string, string> = {
-                    microsoft_link: "Microsoft Link (self-booked)",
-                    agent_call_in: "Agent Call-In",
-                  };
-                  const bookedCallsBySource = [
-                    { label: "Channel Blend", count: channelBlendAppointmentsCount },
-                    ...webhookBookedCallsBySource.map((r) => ({
-                      label: webhookSourceLabels[r.source] ?? r.source,
-                      count: r.count,
-                    })),
-                  ];
-                  const totalBookedCalls = bookedCallsBySource.reduce((sum, r) => sum + r.count, 0);
-                  return (
-                    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                      <div className="flex flex-col justify-center rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
-                        <Metric label="Total Booked Calls" value={totalBookedCalls.toLocaleString()} />
-                        <p className="mt-2 text-xs text-body-gray">
-                          15-minute HTQ Discovery calls booked in {rangeLabel}, across both sources.
-                        </p>
-                        {bookedCallsByCarrier.length > 0 && (
-                          <p className="mt-3 text-xs text-body-gray">
-                            Top carrier:{" "}
-                            <span className="font-semibold text-charcoal">
-                              {bookedCallsByCarrier[0].carrier}
-                            </span>{" "}
-                            ({bookedCallsByCarrier[0].count.toLocaleString()})
-                          </p>
-                        )}
-                      </div>
-                      <DonutChart
-                        title="Booked Calls by Source"
-                        segments={bookedCallsBySource.map((r) => ({ label: r.label, value: r.count }))}
-                      />
-                      <HorizontalBarList
-                        title="Booked Calls by Carrier"
-                        accent="bg-violet-500"
-                        rows={bookedCallsByCarrier.map((r) => ({ label: r.carrier, count: r.count }))}
-                      />
-                    </div>
-                  );
-                })()}
+                <BookedCallsSummary
+                  rangeParam={rangeParam}
+                  channelBlendAppointmentsCount={channelBlendAppointmentsCount}
+                  webhookBookedCallsBySource={webhookBookedCallsBySource}
+                  bookedCallsByCarrier={bookedCallsByCarrier}
+                />
                 <AllSourcesDigestCard digest={allSourcesDigest} />
                 <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <DonutChart
