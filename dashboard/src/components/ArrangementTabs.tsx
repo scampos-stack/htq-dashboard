@@ -12,38 +12,36 @@ const ARRANGEMENTS = [
   { value: "support", label: "Support", dot: "bg-teal-500" },
 ];
 
-// Saved custom views (see DashboardViewsManager) show up as extra pills
-// after the fixed arrangements, with value "view-<id>" — same mechanism,
-// just a dynamic list instead of a fixed one.
+// Saved custom views (see DashboardViewsManager) are picked by value
+// "view-<id>", same mechanism as the fixed arrangements. A pill per view
+// got noisy once there were more than a couple, so they live in a dropdown
+// next to the fixed tabs instead of one pill each.
 export function ArrangementTabs({ views = [] }: { views?: { id: number; name: string }[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const current = searchParams.get("arrangement") ?? "overview";
-  const allTabs = [
-    ...ARRANGEMENTS,
-    ...views.map((v) => ({ value: `view-${v.id}`, label: v.name, dot: "bg-violet-500" })),
-  ];
+  const activeViewValue = current.startsWith("view-") ? current : "";
+
+  function go(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "overview" || value === "") {
+      params.delete("arrangement");
+    } else {
+      params.set("arrangement", value);
+    }
+    router.push(`/?${params.toString()}`);
+  }
 
   return (
-    <nav className="flex flex-wrap gap-2">
-      {allTabs.map((a) => {
+    <nav className="flex flex-wrap items-center gap-2">
+      {ARRANGEMENTS.map((a) => {
         const active = current === a.value;
         return (
           <button
             key={a.value}
-            onClick={() => {
-              const params = new URLSearchParams(searchParams.toString());
-              if (a.value === "overview") {
-                params.delete("arrangement");
-              } else {
-                params.set("arrangement", a.value);
-              }
-              router.push(`/?${params.toString()}`);
-            }}
+            onClick={() => go(a.value)}
             className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors ${
-              active
-                ? "bg-charcoal text-white"
-                : "bg-white text-charcoal hover:bg-charcoal/5"
+              active ? "bg-charcoal text-white" : "bg-white text-charcoal hover:bg-charcoal/5"
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${a.dot}`} />
@@ -51,6 +49,22 @@ export function ArrangementTabs({ views = [] }: { views?: { id: number; name: st
           </button>
         );
       })}
+      {views.length > 0 && (
+        <select
+          value={activeViewValue}
+          onChange={(e) => go(e.target.value)}
+          className={`rounded-full border-none px-4 py-2.5 text-sm font-semibold outline-none ${
+            activeViewValue ? "bg-charcoal text-white" : "bg-white text-charcoal hover:bg-charcoal/5"
+          }`}
+        >
+          <option value="">Saved Views</option>
+          {views.map((v) => (
+            <option key={v.id} value={`view-${v.id}`}>
+              {v.name}
+            </option>
+          ))}
+        </select>
+      )}
     </nav>
   );
 }

@@ -859,20 +859,21 @@ export default async function Home({
       <DashboardHeader active="client" />
 
       <div className="mx-auto max-w-screen-2xl px-6 py-10 sm:px-10">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
           <Suspense fallback={null}>
             <ArrangementTabs views={dashboardViews.map((v) => ({ id: v.id, name: v.name }))} />
           </Suspense>
-          <Link
-            href="/broadcast-drafts"
-            className="rounded-full border border-black/10 bg-white px-5 py-2.5 text-sm font-semibold text-charcoal shadow-sm transition-colors hover:bg-charcoal/5"
-          >
-            Marketing Schedule
-          </Link>
-        </div>
-
-        <div className="mb-8">
-          <DashboardViewsManager views={dashboardViews} />
+          <div className="flex flex-wrap items-center gap-3">
+            <Suspense fallback={null}>
+              <DashboardViewsManager views={dashboardViews} activeViewId={customView?.id ?? null} />
+            </Suspense>
+            <Link
+              href="/broadcast-drafts"
+              className="rounded-full border border-black/10 bg-white px-5 py-2.5 text-sm font-semibold text-charcoal shadow-sm transition-colors hover:bg-charcoal/5"
+            >
+              Marketing Schedule
+            </Link>
+          </div>
         </div>
 
         <main className="min-w-0">

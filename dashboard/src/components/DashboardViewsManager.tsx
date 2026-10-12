@@ -1,14 +1,25 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { WIDGET_CATALOG, WIDGET_LABELS } from "@/lib/dashboard-widgets";
 import type { DashboardView } from "@/lib/data";
 
 const TABS = [...new Set(WIDGET_CATALOG.map((w) => w.tab))];
 
-export function DashboardViewsManager({ views }: { views: DashboardView[] }) {
+export function DashboardViewsManager({
+  views,
+  activeViewId = null,
+}: {
+  views: DashboardView[];
+  // The view currently open on the page (if any) — shows inline Edit/Delete
+  // for just that one, instead of listing every saved view's controls on
+  // screen at once.
+  activeViewId?: number | null;
+}) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeView = activeViewId != null ? (views.find((v) => v.id === activeViewId) ?? null) : null;
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
@@ -88,23 +99,44 @@ export function DashboardViewsManager({ views }: { views: DashboardView[] }) {
       const res = await fetch(`/api/dashboard-views/${v.id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to delete view");
-      router.refresh();
+      // Deleting the view currently open leaves a dead "view-<id>" in the
+      // URL — back out to Overview instead of showing an empty page.
+      if (activeViewId === v.id) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("arrangement");
+        router.push(`/?${params.toString()}`);
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete view");
     }
   }
 
   return (
-    <div>
-      <button
-        onClick={startNew}
-        className="rounded-full border border-black/10 bg-white px-4 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
-      >
-        + New View
-      </button>
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        {activeView && (
+          <div className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs">
+            <button onClick={() => startEdit(activeView)} className="font-semibold text-charcoal hover:underline">
+              Edit View
+            </button>
+            <span className="text-black/15">|</span>
+            <button onClick={() => handleDelete(activeView)} className="text-red-600 hover:underline">
+              Delete
+            </button>
+          </div>
+        )}
+        <button
+          onClick={startNew}
+          className="rounded-full border border-black/10 bg-white px-4 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
+        >
+          + New View
+        </button>
+      </div>
 
       {open && (
-        <div className="mt-3 rounded-3xl border border-black/10 bg-white p-5 shadow-sm">
+        <div className="absolute right-0 top-full z-30 mt-2 w-[min(92vw,760px)] rounded-3xl border border-black/10 bg-white p-5 shadow-lg">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-heading text-base font-semibold text-charcoal">
               {editingId ? "Edit View" : "New Custom View"}
@@ -225,25 +257,6 @@ export function DashboardViewsManager({ views }: { views: DashboardView[] }) {
               {saving ? "Saving…" : editingId ? "Save Changes" : "Create View"}
             </button>
           </div>
-        </div>
-      )}
-
-      {views.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {views.map((v) => (
-            <div
-              key={v.id}
-              className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1 text-xs"
-            >
-              <span className="font-semibold text-charcoal">{v.name}</span>
-              <button onClick={() => startEdit(v)} className="text-body-gray underline hover:text-charcoal">
-                Edit
-              </button>
-              <button onClick={() => handleDelete(v)} className="text-red-600 underline hover:text-red-700">
-                Delete
-              </button>
-            </div>
-          ))}
         </div>
       )}
     </div>
