@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { supabaseServerAuth } from "@/lib/supabase/server";
-import { isKnownWidgetId } from "@/lib/dashboard-widgets";
+import { isKnownWidgetId, parseWidgetToken } from "@/lib/dashboard-widgets";
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +11,9 @@ export async function POST(req: Request) {
     if (!name) {
       return NextResponse.json({ ok: false, error: "A view name is required." }, { status: 400 });
     }
-    const validIds = widgetIds.filter((id: unknown): id is string => typeof id === "string" && isKnownWidgetId(id));
+    const validIds = widgetIds.filter(
+      (id: unknown): id is string => typeof id === "string" && isKnownWidgetId(parseWidgetToken(id).id)
+    );
     if (validIds.length === 0) {
       return NextResponse.json({ ok: false, error: "Pick at least one widget." }, { status: 400 });
     }

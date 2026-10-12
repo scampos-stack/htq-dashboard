@@ -2,10 +2,21 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { WIDGET_CATALOG, WIDGET_LABELS } from "@/lib/dashboard-widgets";
+import {
+  WIDGET_CATALOG,
+  WIDGET_LABELS,
+  WIDGET_DEFAULT_WIDTHS,
+  parseWidgetToken,
+  makeWidgetToken,
+  type WidgetWidth,
+} from "@/lib/dashboard-widgets";
 import type { DashboardView } from "@/lib/data";
 
 const TABS = [...new Set(WIDGET_CATALOG.map((w) => w.tab))];
+
+function baseId(token: string): string {
+  return parseWidgetToken(token).id;
+}
 
 export function DashboardViewsManager({
   views,
@@ -46,23 +57,31 @@ export function DashboardViewsManager({
     setOpen(true);
   }
 
-  function toggle(id: string) {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  function toggle(id: string, defaultWidth: WidgetWidth) {
+    setSelected((prev) =>
+      prev.some((t) => baseId(t) === id) ? prev.filter((t) => baseId(t) !== id) : [...prev, makeWidgetToken(id, defaultWidth)]
+    );
   }
 
-  function remove(id: string) {
-    setSelected((prev) => prev.filter((x) => x !== id));
+  function remove(token: string) {
+    setSelected((prev) => prev.filter((t) => t !== token));
+  }
+
+  function setWidth(token: string, width: WidgetWidth) {
+    setSelected((prev) => prev.map((t) => (t === token ? makeWidgetToken(baseId(t), width) : t)));
   }
 
   // Dropping a catalog widget onto the drop zone adds it (at a specific spot
-  // if dropped between two already-added chips, else at the end). Dropping
-  // an already-added chip onto another one reorders instead of duplicating.
+  // if dropped between two already-added chips, else at the end), keeping
+  // its current width if it's already in the view. Dropping an
+  // already-added chip onto another one reorders instead of duplicating.
   function handleDropOnZone(atIndex?: number) {
     setDragOverZone(false);
     setDropIndex(null);
     if (!dragId) return;
+    const draggedBase = baseId(dragId);
     setSelected((prev) => {
-      const withoutDragged = prev.filter((x) => x !== dragId);
+      const withoutDragged = prev.filter((t) => baseId(t) !== draggedBase);
       const insertAt = atIndex ?? withoutDragged.length;
       const next = [...withoutDragged];
       next.splice(insertAt, 0, dragId);
@@ -167,14 +186,17 @@ export function DashboardViewsManager({
                   <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-body-gray">{tab}</h4>
                   <div className="flex flex-col gap-1.5">
                     {WIDGET_CATALOG.filter((w) => w.tab === tab).map((w) => {
-                      const added = selected.includes(w.id);
+                      const added = selected.some((t) => baseId(t) === w.id);
                       return (
                         <div
                           key={w.id}
                           draggable
-                          onDragStart={() => setDragId(w.id)}
+                          onDragStart={() => {
+                            const existing = selected.find((t) => baseId(t) === w.id);
+                            setDragId(existing ?? makeWidgetToken(w.id, WIDGET_DEFAULT_WIDTHS[w.id] ?? "full"));
+                          }}
                           onDragEnd={() => setDragId(null)}
-                          onClick={() => toggle(w.id)}
+                          onClick={() => toggle(w.id, WIDGET_DEFAULT_WIDTHS[w.id] ?? "full")}
                           className={`cursor-grab select-none rounded-lg border px-2.5 py-1.5 text-sm transition-colors active:cursor-grabbing ${
                             added
                               ? "border-brand-green/40 bg-brand-green/10 text-brand-green-dark"
@@ -212,37 +234,51 @@ export function DashboardViewsManager({
                     Drag a widget here, or click one on the left
                   </div>
                 ) : (
-                  selected.map((id, i) => (
-                    <div
-                      key={id}
-                      draggable
-                      onDragStart={() => setDragId(id)}
-                      onDragEnd={() => {
-                        setDragId(null);
-                        setDropIndex(null);
-                      }}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setDropIndex(i);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        handleDropOnZone(i);
-                      }}
-                      className={`flex items-center justify-between gap-2 rounded-lg border bg-white px-2.5 py-1.5 text-sm text-charcoal shadow-sm transition-opacity ${
-                        dragId === id ? "opacity-40" : ""
-                      } ${dropIndex === i && dragId && dragId !== id ? "border-brand-green" : "border-black/10"}`}
-                    >
-                      <span className="cursor-grab select-none active:cursor-grabbing">⠿ {WIDGET_LABELS[id] ?? id}</span>
-                      <button
-                        onClick={() => remove(id)}
-                        className="text-body-gray hover:text-red-600"
-                        aria-label={`Remove ${WIDGET_LABELS[id] ?? id}`}
+                  selected.map((token, i) => {
+                    const { id, width } = parseWidgetToken(token);
+                    return (
+                      <div
+                        key={token}
+                        draggable
+                        onDragStart={() => setDragId(token)}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDropIndex(null);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDropIndex(i);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleDropOnZone(i);
+                        }}
+                        className={`flex items-center justify-between gap-2 rounded-lg border bg-white px-2.5 py-1.5 text-sm text-charcoal shadow-sm transition-opacity ${
+                          dragId === token ? "opacity-40" : ""
+                        } ${dropIndex === i && dragId && dragId !== token ? "border-brand-green" : "border-black/10"}`}
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))
+                        <span className="cursor-grab select-none truncate active:cursor-grabbing">
+                          ⠿ {WIDGET_LABELS[id] ?? id}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            onClick={() => setWidth(token, width === "half" ? "full" : "half")}
+                            title="Toggle how much row width this widget takes"
+                            className="rounded-full border border-black/10 px-2 py-0.5 text-[10px] font-semibold text-body-gray hover:bg-charcoal/5"
+                          >
+                            {width === "half" ? "Half" : "Full"}
+                          </button>
+                          <button
+                            onClick={() => remove(token)}
+                            className="text-body-gray hover:text-red-600"
+                            aria-label={`Remove ${WIDGET_LABELS[id] ?? id}`}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { isKnownWidgetId } from "@/lib/dashboard-widgets";
+import { isKnownWidgetId, parseWidgetToken } from "@/lib/dashboard-widgets";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -15,7 +15,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
     if ("widgetIds" in body) {
       const widgetIds = Array.isArray(body.widgetIds) ? body.widgetIds : [];
-      const validIds = widgetIds.filter((wid: unknown): wid is string => typeof wid === "string" && isKnownWidgetId(wid));
+      const validIds = widgetIds.filter(
+        (wid: unknown): wid is string => typeof wid === "string" && isKnownWidgetId(parseWidgetToken(wid).id)
+      );
       if (validIds.length === 0) {
         return NextResponse.json({ ok: false, error: "A view needs at least one widget." }, { status: 400 });
       }

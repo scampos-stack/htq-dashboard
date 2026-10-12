@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type ReactElement } from "react";
+import { parseWidgetToken } from "@/lib/dashboard-widgets";
 
 // Reorders already-rendered widget panels by dragging them (native HTML5
 // drag-and-drop, no new dependency) and persists the new order back to the
@@ -57,9 +58,9 @@ export function DashboardViewDragList({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {dirty && (
-        <div className="sticky top-2 z-10 flex items-center justify-between gap-3 rounded-2xl bg-charcoal px-4 py-2.5 text-sm text-white shadow-lg">
+        <div className="sticky top-2 z-10 col-span-full flex items-center justify-between gap-3 rounded-2xl bg-charcoal px-4 py-2.5 text-sm text-white shadow-lg">
           <span>Layout changed — save to keep this order for everyone.</span>
           <div className="flex gap-2">
             <button
@@ -84,6 +85,7 @@ export function DashboardViewDragList({
       {order.map((id) => {
         const child = byId.get(id);
         if (!child) return null;
+        const { width } = parseWidgetToken(id);
         return (
           <div
             key={id}
@@ -91,7 +93,9 @@ export function DashboardViewDragList({
             onDragStart={() => setDragId(id)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(id)}
-            className={`group relative rounded-3xl transition-opacity ${dragId === id ? "opacity-40" : ""}`}
+            className={`group relative rounded-3xl transition-opacity ${width === "full" ? "lg:col-span-2" : ""} ${
+              dragId === id ? "opacity-40" : ""
+            }`}
           >
             <div
               className="absolute -left-2 top-1/2 hidden -translate-y-1/2 cursor-grab select-none rounded-full bg-white px-1.5 py-3 text-body-gray shadow-sm group-hover:block active:cursor-grabbing"

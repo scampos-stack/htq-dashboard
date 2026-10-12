@@ -62,6 +62,7 @@ import { CsatMonthlyTrendChart } from "@/components/CsatMonthlyTrendChart";
 import { CsatByAgentTable } from "@/components/CsatByAgentTable";
 import { DashboardViewDragList } from "@/components/DashboardViewDragList";
 import { DashboardViewsManager } from "@/components/DashboardViewsManager";
+import { parseWidgetToken } from "@/lib/dashboard-widgets";
 import { DispositionRow } from "@/components/DispositionRow";
 import { ExecutiveSummaryCard } from "@/components/ExecutiveSummaryCard";
 import { SentimentBreakdown } from "@/components/SentimentBreakdown";
@@ -810,7 +811,8 @@ export default async function Home({
   // Custom View, reusing the exact components the normal tabs render — the
   // data for every widget is already fetched above regardless of which tab
   // is showing, so no extra fetching is needed here.
-  function renderWidget(id: string) {
+  function renderWidget(token: string) {
+    const { id } = parseWidgetToken(token);
     switch (id) {
       case "overview.sourceMixDonut":
         return (
