@@ -30,14 +30,14 @@ export function DonutChart({
   const nonZero = segments.filter((s) => s.value > 0);
 
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm">
+    <div className="flex h-full flex-col rounded-3xl bg-white p-6 shadow-sm">
       <h3 className="mb-1 font-heading text-base font-semibold text-charcoal">{title}</h3>
       {description && <p className="mb-3 text-xs text-body-gray">{description}</p>}
 
       {total === 0 ? (
         <p className="text-sm text-body-gray">No data yet.</p>
       ) : (
-        <div className="flex flex-wrap items-center gap-6">
+        <div className="flex flex-1 flex-wrap items-center justify-center gap-6">
           <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={title}>
             <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
               <circle

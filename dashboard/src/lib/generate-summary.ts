@@ -100,7 +100,13 @@ export async function generateWoodpeckerExecutiveSummary(): Promise<{
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 1024,
+    max_tokens: 4096,
+    // Opus 5 runs thinking on by default (unlike Opus 4.8/4.7) — without an
+    // explicit effort cap, a large input can let thinking alone consume the
+    // whole max_tokens budget before any answer text is written, leaving
+    // stop_reason "max_tokens" with no text block at all. "low" is plenty
+    // for a bounded, non-agentic summarization task like this one.
+    output_config: { effort: "low" },
     system:
       "You are an expert email marketing analyst. Analyze the provided " +
       "campaign performance data and write an Executive Summary (150-250 " +
@@ -219,7 +225,10 @@ async function generateChannelBlendCategoryPatterns(
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 2048,
+    max_tokens: 6000,
+    // See the executive-summary call above — Opus 5's default-on thinking
+    // can otherwise eat the whole budget with no text output.
+    output_config: { effort: "low" },
     system:
       `You analyze call disposition notes from the "${category}" category ` +
       "of a lead-generation outreach team's Channel Blend spreadsheet. Each " +
@@ -384,7 +393,11 @@ export async function generateZendeskTopicsSummary(): Promise<{
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 4096,
+    max_tokens: 8000,
+    // See the executive-summary call above — Opus 5's default-on thinking
+    // can otherwise eat the whole budget with no text output. This is the
+    // call that actually hit that failure (full ticket digest as input).
+    output_config: { effort: "low" },
     system:
       "You analyze support ticket subjects/descriptions from a " +
       "lead-generation company's Zendesk. Different tickets describe the " +
@@ -559,7 +572,10 @@ export async function generateAllSourcesDigest(range: ZendeskDateRange): Promise
 
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 900,
+    max_tokens: 4096,
+    // See the executive-summary call above — Opus 5's default-on thinking
+    // can otherwise eat the whole budget with no text output.
+    output_config: { effort: "low" },
     system:
       "You write a leadership-facing executive digest for a company that " +
       "runs cold-email lead generation (Woodpecker, Keap) and has a " +
@@ -696,7 +712,10 @@ export async function regenerateBroadcastDraftFromComment(
   const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 1024,
+    max_tokens: 4096,
+    // See the executive-summary call above — Opus 5's default-on thinking
+    // can otherwise eat the whole budget with no text output.
+    output_config: { effort: "low" },
     system:
       "You edit one marketing email draft for an insurance-lead-generation " +
       "company, based on a single piece of human feedback. You are given " +
