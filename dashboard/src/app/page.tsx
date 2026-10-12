@@ -51,7 +51,6 @@ import { CampaignProspectsPanel } from "@/components/CampaignProspectsPanel";
 import { ZendeskSection } from "@/components/ZendeskSection";
 import { JustCallSection } from "@/components/JustCallSection";
 import { AllSourcesDigestCard } from "@/components/AllSourcesDigestCard";
-import { VolumeTrendChart } from "@/components/VolumeTrendChart";
 import { SectionTabs } from "@/components/SectionTabs";
 import { Metric } from "@/components/Metric";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
@@ -840,20 +839,21 @@ export default async function Home({
                       .filter((r) => r.connected)
                       .map((r) => ({ label: r.label, value: r.sent }))}
                   />
-                  <VolumeTrendChart points={volumeTrend} />
+                  {/* By Carrier lives here instead of the Woodpecker daily
+                      trend chart — that chart is empty until a Woodpecker
+                      domain CSV with daily figures is imported, which rarely
+                      happens, so this slot was dead space most of the time. */}
+                  <div id="overview-carrier">
+                    <h3 className="mb-3 font-heading text-base font-semibold text-charcoal">By Carrier</h3>
+                    <CarrierSummaryTable rows={carrierSummary} />
+                  </div>
                 </div>
                 <SourceSummaryTable rows={sourceSummary} />
               </SectionBlock>
 
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                <SectionBlock id="overview-carrier" title="By Carrier" accent="border-charcoal">
-                  <CarrierSummaryTable rows={carrierSummary} />
-                </SectionBlock>
-
-                <SectionBlock id="overview-vip" title="VIP Form Submissions" accent="border-charcoal">
-                  <VipSubmissionsWidget submissions={vipSubmissions} />
-                </SectionBlock>
-              </div>
+              <SectionBlock id="overview-vip" title="VIP Form Submissions" accent="border-charcoal">
+                <VipSubmissionsWidget submissions={vipSubmissions} />
+              </SectionBlock>
             </>
           )}
 
