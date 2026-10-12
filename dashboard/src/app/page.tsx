@@ -608,24 +608,19 @@ function BookedCallsSummary({
       count: r.count,
     })),
   ];
-  const totalBookedCalls = bookedCallsBySource.reduce((sum, r) => sum + r.count, 0);
+  // The donut's own center already shows the total, so a separate KPI tile
+  // with the same number was redundant — folded into the donut's
+  // description line instead, alongside the one stat that isn't shown
+  // anywhere else on this row (top carrier).
+  const topCarrierNote =
+    bookedCallsByCarrier.length > 0
+      ? ` Top carrier: ${bookedCallsByCarrier[0].carrier} (${bookedCallsByCarrier[0].count.toLocaleString()}).`
+      : "";
   return (
-    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="flex flex-col justify-center rounded-3xl border-l-4 border-violet-500 bg-white p-6 shadow-sm">
-        <Metric label="Total Booked Calls" value={totalBookedCalls.toLocaleString()} />
-        <p className="mt-2 text-xs text-body-gray">
-          15-minute HTQ Discovery calls booked in {rangeLabel}, across both sources.
-        </p>
-        {bookedCallsByCarrier.length > 0 && (
-          <p className="mt-3 text-xs text-body-gray">
-            Top carrier:{" "}
-            <span className="font-semibold text-charcoal">{bookedCallsByCarrier[0].carrier}</span>{" "}
-            ({bookedCallsByCarrier[0].count.toLocaleString()})
-          </p>
-        )}
-      </div>
+    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
       <DonutChart
         title="Booked Calls by Source"
+        description={`15-minute HTQ Discovery calls booked in ${rangeLabel}, across both sources.${topCarrierNote}`}
         segments={bookedCallsBySource.map((r) => ({ label: r.label, value: r.count }))}
       />
       <HorizontalBarList
