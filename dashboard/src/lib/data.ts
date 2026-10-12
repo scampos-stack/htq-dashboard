@@ -583,6 +583,8 @@ export type VipSubmission = {
   email: string | null;
   dateApplied: string;
   formDetails: string;
+  status: string | null;
+  notes: string | null;
 };
 
 export async function getVipSubmissions(): Promise<VipSubmission[]> {
@@ -634,9 +636,33 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
         email: row.contact.email ?? null,
         dateApplied: row.date_applied,
         formDetails,
+        status: null as string | null,
+        notes: null as string | null,
       };
     })
   );
+
+  // Status/notes aren't a Keap field — they're tracked locally (migration
+  // 031), keyed by contact id, and merged in here. Pending migration or a
+  // query failure just means every row shows no status/notes yet.
+  try {
+    const supabase = supabaseServer();
+    const { data: overlay, error } = await supabase
+      .from("vip_submission_status")
+      .select("contact_id, status, notes")
+      .in("contact_id", submissions.map((s) => s.contactId));
+    if (error) throw error;
+    const byContact = new Map((overlay ?? []).map((r) => [r.contact_id, r]));
+    for (const s of submissions) {
+      const row = byContact.get(s.contactId);
+      if (row) {
+        s.status = row.status;
+        s.notes = row.notes;
+      }
+    }
+  } catch (err) {
+    console.error("[data] vip_submission_status fetch failed (migration 031 pending?):", err instanceof Error ? err.message : err);
+  }
 
   return submissions;
 }

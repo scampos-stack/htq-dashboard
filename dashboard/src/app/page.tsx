@@ -57,6 +57,7 @@ import { Metric } from "@/components/Metric";
 import { ZendeskRangeSelect } from "@/components/ZendeskRangeSelect";
 import { EventsRangeSelect } from "@/components/EventsRangeSelect";
 import { KeapBroadcastsTable } from "@/components/KeapBroadcastsTable";
+import { VipSubmissionsTable } from "@/components/VipSubmissionsTable";
 import { DispositionRow } from "@/components/DispositionRow";
 import { ExecutiveSummaryCard } from "@/components/ExecutiveSummaryCard";
 import { SentimentBreakdown } from "@/components/SentimentBreakdown";
@@ -575,36 +576,7 @@ function VipSubmissionsWidget({
 }: {
   submissions: Awaited<ReturnType<typeof getVipSubmissions>>;
 }) {
-  return (
-    <div className="overflow-x-auto rounded-3xl bg-white p-6 shadow-sm">
-      {submissions.length === 0 ? (
-        <p className="text-sm text-body-gray">No VIP form submissions yet.</p>
-      ) : (
-        <table className="w-full min-w-[480px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
-              <th className="py-2 pr-4">Submission Date</th>
-              <th className="py-2 pr-4">Contact Name</th>
-              <th className="py-2 pr-4">Email</th>
-              <th className="py-2 pr-4">Form Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            {submissions.map((s) => (
-              <tr key={s.contactId} className="border-b border-black/5">
-                <td className="py-3 pr-4">
-                  {new Date(s.dateApplied).toLocaleDateString()}
-                </td>
-                <td className="py-3 pr-4 font-semibold text-charcoal">{s.name}</td>
-                <td className="py-3 pr-4">{s.email ?? "—"}</td>
-                <td className="py-3 pr-4 text-body-gray">{s.formDetails}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
+  return <VipSubmissionsTable submissions={submissions} />;
 }
 
 export default async function Home({
