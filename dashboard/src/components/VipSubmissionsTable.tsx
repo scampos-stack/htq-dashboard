@@ -21,6 +21,56 @@ const STATUS_STYLE: Record<string, string> = {
   non_qualified: "bg-charcoal/10 text-body-gray",
 };
 
+// Keap's owner on this account is a shared/generic login (see data.ts),
+// not reliably one of these three — so the default option just carries
+// whatever name data.ts already derived (the <select>'s own first option),
+// and picking one of the team names overrides it, stored per contact.
+const OWNER_OPTIONS = ["Paula", "Sarah", "Mohammed", "Unassigned"];
+
+function OwnerSelect({ contactId, owner }: { contactId: number; owner: string | null }) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const current = owner ?? "";
+
+  async function handleChange(next: string) {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/vip-submissions/${contactId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner: next }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to update owner");
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update owner");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <select
+      value={current}
+      disabled={saving}
+      onChange={(e) => handleChange(e.target.value)}
+      className="rounded-lg border border-black/10 bg-white px-2 py-1 text-sm text-charcoal disabled:opacity-60"
+    >
+      {/* Shows whatever data.ts already resolved (Keap's owner, or a prior
+          override) as the current selection, even if it isn't one of the
+          fixed team options below — picking one of those replaces it. */}
+      {current && !OWNER_OPTIONS.includes(current) && <option value={current}>{current}</option>}
+      {!current && <option value="">—</option>}
+      {OWNER_OPTIONS.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function StatusSelect({ contactId, status }: { contactId: number; status: string | null }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -178,7 +228,9 @@ export function VipSubmissionsTable({ submissions }: { submissions: VipSubmissio
                 <td className="py-3 pr-4 font-semibold text-charcoal">{s.name}</td>
                 <td className="py-3 pr-4">{s.email ?? "—"}</td>
                 <td className="py-3 pr-4 text-body-gray">{s.formDetails}</td>
-                <td className="py-3 pr-4 text-body-gray">{s.owner ?? "—"}</td>
+                <td className="py-3 pr-4">
+                  <OwnerSelect contactId={s.contactId} owner={s.owner} />
+                </td>
                 <td className="py-3 pr-4">
                   <StatusSelect contactId={s.contactId} status={s.status} />
                 </td>

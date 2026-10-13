@@ -15,6 +15,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ contac
     const update: Record<string, unknown> = { contact_id: id, updated_at: new Date().toISOString() };
     if ("status" in body) update.status = body.status || null;
     if ("notes" in body) update.notes = body.notes || null;
+    if ("owner" in body) update.owner = body.owner || null;
     if (Object.keys(update).length <= 2) {
       return NextResponse.json({ ok: false, error: "Nothing to update." }, { status: 400 });
     }

@@ -577,6 +577,15 @@ export async function getBroadcastDraftComments(draftId: number): Promise<Broadc
   }));
 }
 
+// "paula@hometownquotes.com" -> "Paula". Only the leading run of letters —
+// strips any dot/number/underscore segment a login like "paula.g" or
+// "paula2" would otherwise drag into the name.
+function firstNameFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  const raw = local.match(/^[a-zA-Z]+/)?.[0] ?? local;
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase() : email;
+}
+
 export type VipSubmission = {
   contactId: number;
   name: string;
@@ -623,12 +632,16 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
         given_name?: string;
         family_name?: string;
         email_address?: string;
+        infusionsoft_id?: string;
       };
       for (const u of (usersData.users ?? []) as KeapUser[]) {
-        const name =
-          u.preferred_name ||
-          [u.given_name, u.family_name].filter(Boolean).join(" ").trim() ||
-          u.email_address;
+        // Prefer a first name derived from the login email over
+        // preferred_name/given_name — several of these are shared/generic
+        // accounts (e.g. owner "Hometown Quotes" whose infusionsoft_id is
+        // actually paula@hometownquotes.com), and the email's local part
+        // is the more useful, person-specific label.
+        const loginEmail = [u.infusionsoft_id, u.email_address].find((e) => e?.includes("@"));
+        const name = loginEmail ? firstNameFromEmail(loginEmail) : u.preferred_name || [u.given_name, u.family_name].filter(Boolean).join(" ").trim();
         if (name) ownerNamesById.set(u.id, name);
       }
     }
@@ -678,13 +691,15 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
   );
 
   // Status/notes aren't a Keap field — they're tracked locally (migration
-  // 031), keyed by contact id, and merged in here. Pending migration or a
-  // query failure just means every row shows no status/notes yet.
+  // 031), keyed by contact id, and merged in here. Owner (migration 033) is
+  // an override on top of the Keap-derived default — only replaces it when
+  // someone's actually set one. Pending migration or a query failure just
+  // means every row shows no status/notes and the Keap-derived owner.
   try {
     const supabase = supabaseServer();
     const { data: overlay, error } = await supabase
       .from("vip_submission_status")
-      .select("contact_id, status, notes")
+      .select("contact_id, status, notes, owner")
       .in("contact_id", submissions.map((s) => s.contactId));
     if (error) throw error;
     const byContact = new Map((overlay ?? []).map((r) => [r.contact_id, r]));
@@ -693,10 +708,11 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
       if (row) {
         s.status = row.status;
         s.notes = row.notes;
+        if (row.owner) s.owner = row.owner;
       }
     }
   } catch (err) {
-    console.error("[data] vip_submission_status fetch failed (migration 031 pending?):", err instanceof Error ? err.message : err);
+    console.error("[data] vip_submission_status fetch failed (migration 031/033 pending?):", err instanceof Error ? err.message : err);
   }
 
   return submissions;
