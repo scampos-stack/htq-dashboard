@@ -583,6 +583,7 @@ export type VipSubmission = {
   email: string | null;
   dateApplied: string;
   formDetails: string;
+  owner: string | null;
   status: string | null;
   notes: string | null;
 };
@@ -605,12 +606,43 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
   };
   const rows = (data.contacts ?? []) as VipRow[];
 
-  // The tag/contacts list doesn't include phone/company — fetch the full
-  // record per contact for "Form Details". Small, fixed-size list (top 10),
-  // so the extra calls are cheap.
+  // Keap's per-user GET (/v1/users/{id}) 404s on this account — the list
+  // endpoint works, so fetch it once (not per-contact) and look owners up
+  // from that instead of making N individual calls that would all fail.
+  const ownerNamesById = new Map<number, string>();
+  try {
+    const usersRes = await fetch("https://api.infusionsoft.com/crm/rest/v1/users", {
+      headers: { Authorization: `Bearer ${key}` },
+      cache: "no-store",
+    });
+    if (usersRes.ok) {
+      const usersData = await usersRes.json();
+      type KeapUser = {
+        id: number;
+        preferred_name?: string;
+        given_name?: string;
+        family_name?: string;
+        email_address?: string;
+      };
+      for (const u of (usersData.users ?? []) as KeapUser[]) {
+        const name =
+          u.preferred_name ||
+          [u.given_name, u.family_name].filter(Boolean).join(" ").trim() ||
+          u.email_address;
+        if (name) ownerNamesById.set(u.id, name);
+      }
+    }
+  } catch {
+    // leave ownerNamesById empty — owner column just shows "—" for everyone
+  }
+
+  // The tag/contacts list doesn't include phone/company/owner — fetch the
+  // full record per contact for "Form Details" and the owner id. Small,
+  // fixed-size list (top 10), so the extra calls are cheap.
   const submissions = await Promise.all(
     rows.map(async (row) => {
       let formDetails = "—";
+      let owner: string | null = null;
       try {
         const detailRes = await fetch(
           `https://api.infusionsoft.com/crm/rest/v1/contacts/${row.contact.id}`,
@@ -623,9 +655,11 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
           formDetails = [phone && `Phone: ${phone}`, company && `Company: ${company}`]
             .filter(Boolean)
             .join(" · ") || "—";
+          const ownerId = detail.owner_id ?? detail.ownerId ?? null;
+          if (ownerId != null) owner = ownerNamesById.get(ownerId) ?? null;
         }
       } catch {
-        // leave as "—" — this is a nice-to-have enrichment, not core data
+        // leave as "—"/null — this is a nice-to-have enrichment, not core data
       }
 
       return {
@@ -636,6 +670,7 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
         email: row.contact.email ?? null,
         dateApplied: row.date_applied,
         formDetails,
+        owner,
         status: null as string | null,
         notes: null as string | null,
       };

@@ -154,13 +154,14 @@ export function VipSubmissionsTable({ submissions }: { submissions: VipSubmissio
           {submissions.length === 0 ? "No VIP form submissions yet." : "No submissions in this date range."}
         </p>
       ) : (
-        <table className="w-full min-w-[720px] border-collapse text-sm">
+        <table className="w-full min-w-[820px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-body-gray">
               <th className="py-2 pr-4">Submission Date</th>
               <th className="py-2 pr-4">Contact Name</th>
               <th className="py-2 pr-4">Email</th>
               <th className="py-2 pr-4">Form Details</th>
+              <th className="py-2 pr-4">Owner</th>
               <th className="py-2 pr-4">Status</th>
               <th className="py-2 pr-4">Notes</th>
             </tr>
@@ -177,6 +178,7 @@ export function VipSubmissionsTable({ submissions }: { submissions: VipSubmissio
                 <td className="py-3 pr-4 font-semibold text-charcoal">{s.name}</td>
                 <td className="py-3 pr-4">{s.email ?? "—"}</td>
                 <td className="py-3 pr-4 text-body-gray">{s.formDetails}</td>
+                <td className="py-3 pr-4 text-body-gray">{s.owner ?? "—"}</td>
                 <td className="py-3 pr-4">
                   <StatusSelect contactId={s.contactId} status={s.status} />
                 </td>
