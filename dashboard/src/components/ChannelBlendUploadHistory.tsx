@@ -117,7 +117,7 @@ function UploadRow({ upload }: { upload: ChannelBlendUploadRow }) {
       <td className="py-3 pr-4 whitespace-nowrap">
         {upload.revertedAt ? (
           <span className="text-xs font-semibold text-body-gray">
-            Reverted {new Date(upload.revertedAt).toLocaleDateString()}
+            Reverted {new Date(upload.revertedAt).toLocaleDateString("en-US")}
           </span>
         ) : (
           <button

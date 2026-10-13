@@ -169,7 +169,10 @@ export function VipSubmissionsTable({ submissions }: { submissions: VipSubmissio
             {rows.map((s) => (
               <tr key={s.contactId} className="border-b border-black/5">
                 <td className="py-3 pr-4 whitespace-nowrap">
-                  {new Date(s.dateApplied).toLocaleDateString()}
+                  {/* Explicit "en-US" so this always reads mm/dd/yyyy,
+                      regardless of the viewer's own system locale (which
+                      otherwise renders it dd/mm/yyyy for some people). */}
+                  {new Date(s.dateApplied).toLocaleDateString("en-US")}
                 </td>
                 <td className="py-3 pr-4 font-semibold text-charcoal">{s.name}</td>
                 <td className="py-3 pr-4">{s.email ?? "—"}</td>

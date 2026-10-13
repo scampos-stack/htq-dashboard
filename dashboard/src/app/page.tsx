@@ -1167,7 +1167,7 @@ export default async function Home({
                         {c.stats && !rangeStats && (
                           <p className="mt-2 text-xs text-body-gray">
                             Last pulled{" "}
-                            {new Date(c.stats.pulled_at).toLocaleDateString()}
+                            {new Date(c.stats.pulled_at).toLocaleDateString("en-US")}
                           </p>
                         )}
 

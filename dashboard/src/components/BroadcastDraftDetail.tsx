@@ -200,7 +200,7 @@ export function BroadcastDraftDetail({
             <BroadcastDraftAssigneeSelect draftId={draft.id} assignedTo={draft.assignedTo} />
           </div>
           <p className="mt-1 text-sm text-body-gray">
-            {new Date(draft.targetDate + "T00:00:00").toLocaleDateString()} · {draft.listSegment}
+            {new Date(draft.targetDate + "T00:00:00").toLocaleDateString("en-US")} · {draft.listSegment}
             {draft.audienceEstimate != null && ` · ~${draft.audienceEstimate.toLocaleString()} recipients`}
             {draft.utmCampaign && ` · UTM: ${draft.utmCampaign}`}
             {" · v"}
