@@ -9,6 +9,7 @@ import {
   getCarrierSummary,
   getKeapBroadcasts,
   getVipSubmissions,
+  getKeapOwnerNames,
   getChannelBlendSummary,
   getChannelBlendAutomationStats,
   getChannelBlendUploads,
@@ -578,10 +579,12 @@ function ChannelBlendSection({
 
 function VipSubmissionsWidget({
   submissions,
+  ownerOptions,
 }: {
   submissions: Awaited<ReturnType<typeof getVipSubmissions>>;
+  ownerOptions: string[];
 }) {
-  return <VipSubmissionsTable submissions={submissions} />;
+  return <VipSubmissionsTable submissions={submissions} ownerOptions={ownerOptions} />;
 }
 
 const WEBHOOK_SOURCE_LABELS: Record<string, string> = {
@@ -738,6 +741,7 @@ export default async function Home({
     csatByAgent,
     archivedSectionKeys,
     dashboardViews,
+    keapOwnerNames,
   ] = await Promise.all([
     getCampaignsWithStats(),
     getSourceSummary(),
@@ -771,6 +775,7 @@ export default async function Home({
     getZendeskCsatByAgent(),
     getArchivedSectionKeys(),
     getDashboardViews(),
+    getKeapOwnerNames(),
   ]);
 
   const channelBlendArchived = archivedSectionKeys.includes("channel_blend");
@@ -824,7 +829,7 @@ export default async function Home({
           </div>
         );
       case "overview.vipSubmissions":
-        return <VipSubmissionsWidget submissions={vipSubmissions} />;
+        return <VipSubmissionsWidget submissions={vipSubmissions} ownerOptions={keapOwnerNames} />;
       case "overview.sourceSummaryTable":
         return <SourceSummaryTable rows={sourceSummary} />;
       case "overview.allSourcesDigest":
@@ -935,7 +940,7 @@ export default async function Home({
               </SectionBlock>
 
               <SectionBlock id="overview-vip" title="VIP Form Submissions" accent="border-charcoal">
-                <VipSubmissionsWidget submissions={vipSubmissions} />
+                <VipSubmissionsWidget submissions={vipSubmissions} ownerOptions={keapOwnerNames} />
               </SectionBlock>
             </>
           )}

@@ -586,6 +586,70 @@ function firstNameFromEmail(email: string): string {
   return raw ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase() : email;
 }
 
+// Shared/system inboxes that happen to be Active Keap users but aren't a
+// person — excluded from the owner picklist so it's just the real team.
+const NON_PERSON_LOGIN_LOCAL_PARTS = new Set([
+  "myfriends",
+  "registration",
+  "admin",
+  "support",
+  "info",
+  "sales",
+  "noreply",
+  "notifications",
+  "donotreply",
+]);
+
+type KeapUser = {
+  id: number;
+  status?: string;
+  preferred_name?: string;
+  given_name?: string;
+  family_name?: string;
+  email_address?: string;
+  infusionsoft_id?: string;
+};
+
+async function fetchKeapUsers(key: string): Promise<KeapUser[]> {
+  const res = await fetch("https://api.infusionsoft.com/crm/rest/v1/users", {
+    headers: { Authorization: `Bearer ${key}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.users ?? []) as KeapUser[];
+}
+
+function keapUserDisplayName(u: KeapUser): string | null {
+  const loginEmail = [u.infusionsoft_id, u.email_address].find((e) => e?.includes("@"));
+  return loginEmail
+    ? firstNameFromEmail(loginEmail)
+    : u.preferred_name || [u.given_name, u.family_name].filter(Boolean).join(" ").trim() || null;
+}
+
+// The live set of names the VIP Owner dropdown offers — every Active Keap
+// user (minus shared inboxes), not a hardcoded list, so a new hire with a
+// Keap login shows up here without a code change.
+export async function getKeapOwnerNames(): Promise<string[]> {
+  const key = process.env.KEAP_API_KEY;
+  if (!key) return [];
+  try {
+    const users = await fetchKeapUsers(key);
+    const names = new Set<string>();
+    for (const u of users) {
+      if (u.status !== "Active") continue;
+      const loginEmail = [u.infusionsoft_id, u.email_address].find((e) => e?.includes("@"));
+      const localPart = loginEmail?.split("@")[0]?.toLowerCase();
+      if (localPart && NON_PERSON_LOGIN_LOCAL_PARTS.has(localPart)) continue;
+      const name = keapUserDisplayName(u);
+      if (name) names.add(name);
+    }
+    return [...names].sort();
+  } catch {
+    return [];
+  }
+}
+
 export type VipSubmission = {
   contactId: number;
   name: string;
@@ -618,32 +682,16 @@ export async function getVipSubmissions(): Promise<VipSubmission[]> {
   // Keap's per-user GET (/v1/users/{id}) 404s on this account — the list
   // endpoint works, so fetch it once (not per-contact) and look owners up
   // from that instead of making N individual calls that would all fail.
+  // Prefers a first name derived from the login email over preferred_name/
+  // given_name — several of these are shared/generic accounts (e.g. owner
+  // "Hometown Quotes" whose infusionsoft_id is actually
+  // paula@hometownquotes.com), and the email's local part is the more
+  // useful, person-specific label.
   const ownerNamesById = new Map<number, string>();
   try {
-    const usersRes = await fetch("https://api.infusionsoft.com/crm/rest/v1/users", {
-      headers: { Authorization: `Bearer ${key}` },
-      cache: "no-store",
-    });
-    if (usersRes.ok) {
-      const usersData = await usersRes.json();
-      type KeapUser = {
-        id: number;
-        preferred_name?: string;
-        given_name?: string;
-        family_name?: string;
-        email_address?: string;
-        infusionsoft_id?: string;
-      };
-      for (const u of (usersData.users ?? []) as KeapUser[]) {
-        // Prefer a first name derived from the login email over
-        // preferred_name/given_name — several of these are shared/generic
-        // accounts (e.g. owner "Hometown Quotes" whose infusionsoft_id is
-        // actually paula@hometownquotes.com), and the email's local part
-        // is the more useful, person-specific label.
-        const loginEmail = [u.infusionsoft_id, u.email_address].find((e) => e?.includes("@"));
-        const name = loginEmail ? firstNameFromEmail(loginEmail) : u.preferred_name || [u.given_name, u.family_name].filter(Boolean).join(" ").trim();
-        if (name) ownerNamesById.set(u.id, name);
-      }
+    for (const u of await fetchKeapUsers(key)) {
+      const name = keapUserDisplayName(u);
+      if (name) ownerNamesById.set(u.id, name);
     }
   } catch {
     // leave ownerNamesById empty — owner column just shows "—" for everyone

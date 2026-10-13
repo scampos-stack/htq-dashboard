@@ -21,13 +21,18 @@ const STATUS_STYLE: Record<string, string> = {
   non_qualified: "bg-charcoal/10 text-body-gray",
 };
 
-// Keap's owner on this account is a shared/generic login (see data.ts),
-// not reliably one of these three — so the default option just carries
-// whatever name data.ts already derived (the <select>'s own first option),
-// and picking one of the team names overrides it, stored per contact.
-const OWNER_OPTIONS = ["Paula", "Sarah", "Mohammed", "Unassigned"];
-
-function OwnerSelect({ contactId, owner }: { contactId: number; owner: string | null }) {
+function OwnerSelect({
+  contactId,
+  owner,
+  options,
+}: {
+  contactId: number;
+  owner: string | null;
+  // Every Active Keap user's first name (see getKeapOwnerNames in data.ts)
+  // — live from Keap, not a hardcoded list, so a new hire with a Keap
+  // login shows up here without a code change. Plus "Unassigned".
+  options: string[];
+}) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const current = owner ?? "";
@@ -58,11 +63,12 @@ function OwnerSelect({ contactId, owner }: { contactId: number; owner: string | 
       className="rounded-lg border border-black/10 bg-white px-2 py-1 text-sm text-charcoal disabled:opacity-60"
     >
       {/* Shows whatever data.ts already resolved (Keap's owner, or a prior
-          override) as the current selection, even if it isn't one of the
-          fixed team options below — picking one of those replaces it. */}
-      {current && !OWNER_OPTIONS.includes(current) && <option value={current}>{current}</option>}
+          override) as the current selection, even if it isn't in the
+          options list below (e.g. the account's owner is Inactive, or a
+          shared mailbox) — picking one of those replaces it. */}
+      {current && !options.includes(current) && <option value={current}>{current}</option>}
       {!current && <option value="">—</option>}
-      {OWNER_OPTIONS.map((o) => (
+      {options.map((o) => (
         <option key={o} value={o}>
           {o}
         </option>
@@ -149,7 +155,14 @@ function NotesCell({ contactId, notes }: { contactId: number; notes: string | nu
   );
 }
 
-export function VipSubmissionsTable({ submissions }: { submissions: VipSubmission[] }) {
+export function VipSubmissionsTable({
+  submissions,
+  ownerOptions,
+}: {
+  submissions: VipSubmission[];
+  ownerOptions: string[];
+}) {
+  const ownerSelectOptions = useMemo(() => [...ownerOptions, "Unassigned"], [ownerOptions]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -229,7 +242,7 @@ export function VipSubmissionsTable({ submissions }: { submissions: VipSubmissio
                 <td className="py-3 pr-4">{s.email ?? "—"}</td>
                 <td className="py-3 pr-4 text-body-gray">{s.formDetails}</td>
                 <td className="py-3 pr-4">
-                  <OwnerSelect contactId={s.contactId} owner={s.owner} />
+                  <OwnerSelect contactId={s.contactId} owner={s.owner} options={ownerSelectOptions} />
                 </td>
                 <td className="py-3 pr-4">
                   <StatusSelect contactId={s.contactId} status={s.status} />
