@@ -36,21 +36,23 @@ export function BroadcastDraftDetail({
 
   const html = useMemo(
     () =>
-      renderBroadcastDraftHtml({
-        preheader: draft.preheader,
-        introParagraphs: draft.introParagraphs,
-        highlightHeading: draft.highlightHeading,
-        highlightBody: draft.highlightBody,
-        highlightBullets: draft.highlightBullets,
-        ctaText: draft.ctaText,
-        ctaUrl: draft.ctaUrl,
-        closingParagraphs: draft.closingParagraphs,
-        signoffLine: draft.signoffLine,
-        signoffSubtext: draft.signoffSubtext,
-        footerNoteText: draft.footerNoteText,
-        footerNoteLinkText: draft.footerNoteLinkText,
-        footerNoteLinkUrl: draft.footerNoteLinkUrl,
-      }),
+      draft.rawHtml?.trim()
+        ? draft.rawHtml
+        : renderBroadcastDraftHtml({
+            preheader: draft.preheader,
+            introParagraphs: draft.introParagraphs,
+            highlightHeading: draft.highlightHeading,
+            highlightBody: draft.highlightBody,
+            highlightBullets: draft.highlightBullets,
+            ctaText: draft.ctaText,
+            ctaUrl: draft.ctaUrl,
+            closingParagraphs: draft.closingParagraphs,
+            signoffLine: draft.signoffLine,
+            signoffSubtext: draft.signoffSubtext,
+            footerNoteText: draft.footerNoteText,
+            footerNoteLinkText: draft.footerNoteLinkText,
+            footerNoteLinkUrl: draft.footerNoteLinkUrl,
+          }),
     [draft]
   );
 

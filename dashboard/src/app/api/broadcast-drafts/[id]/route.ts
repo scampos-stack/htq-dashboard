@@ -33,6 +33,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       footerNoteText: "footer_note_text",
       footerNoteLinkText: "footer_note_link_text",
       footerNoteLinkUrl: "footer_note_link_url",
+      rawHtml: "raw_html",
     };
 
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };

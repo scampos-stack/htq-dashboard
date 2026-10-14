@@ -42,6 +42,7 @@ export async function POST(req: Request) {
         footer_note_text: body.footerNoteText || null,
         footer_note_link_text: body.footerNoteLinkText || null,
         footer_note_link_url: body.footerNoteLinkUrl || null,
+        raw_html: body.rawHtml || null,
       })
       .select("id")
       .single();

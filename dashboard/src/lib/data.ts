@@ -432,11 +432,17 @@ export type BroadcastDraft = {
   footerNoteLinkText: string | null;
   footerNoteLinkUrl: string | null;
   loggedBroadcastId: number | null;
+  // When set, the preview and "Copy HTML for Keap" use this verbatim
+  // instead of rebuilding from the structured fields above — see
+  // migration 034. The structured fields still get a best-effort fill on
+  // paste/upload (for display/editing), they just no longer gate what can
+  // be sent once a draft has its own raw HTML.
+  rawHtml: string | null;
   updatedAt: string;
 };
 
 const BROADCAST_DRAFT_COLUMNS =
-  "id, campaign_theme, target_date, list_segment, focus, utm_campaign, audience_estimate, status, assigned_to, version, subject, preheader, intro_paragraphs, highlight_heading, highlight_body, highlight_bullets, cta_text, cta_url, closing_paragraph, closing_paragraphs, signoff_line, signoff_subtext, footer_note_text, footer_note_link_text, footer_note_link_url, logged_broadcast_id, updated_at";
+  "id, campaign_theme, target_date, list_segment, focus, utm_campaign, audience_estimate, status, assigned_to, version, subject, preheader, intro_paragraphs, highlight_heading, highlight_body, highlight_bullets, cta_text, cta_url, closing_paragraph, closing_paragraphs, signoff_line, signoff_subtext, footer_note_text, footer_note_link_text, footer_note_link_url, logged_broadcast_id, raw_html, updated_at";
 
 // Baseline (migration 022 only) — used if the full select fails, which
 // means one of migrations 025/026/027 hasn't run yet. Rather than cascade
@@ -476,6 +482,7 @@ function mapBroadcastDraftRow(r: any): BroadcastDraft {
     footerNoteLinkText: r.footer_note_link_text,
     footerNoteLinkUrl: r.footer_note_link_url,
     loggedBroadcastId: r.logged_broadcast_id ?? null,
+    rawHtml: r.raw_html ?? null,
     updatedAt: r.updated_at,
   };
 }
@@ -495,7 +502,7 @@ export async function getBroadcastDrafts(status?: BroadcastDraftStatus): Promise
       .order("target_date", { ascending: true });
     if (status) fallbackQuery = fallbackQuery.eq("status", status);
     const fallback = await fallbackQuery;
-    data = fallback.data?.map((r) => ({ ...r, assigned_to: null, highlight_bullets: [], closing_paragraphs: [], logged_broadcast_id: null })) ?? null;
+    data = fallback.data?.map((r) => ({ ...r, assigned_to: null, highlight_bullets: [], closing_paragraphs: [], logged_broadcast_id: null, raw_html: null })) ?? null;
     error = fallback.error;
   }
   if (error) {
@@ -518,7 +525,7 @@ export async function getBroadcastDraft(id: number): Promise<BroadcastDraft | nu
       .select(BROADCAST_DRAFT_COLUMNS_BASELINE)
       .eq("id", id)
       .maybeSingle();
-    data = fallback.data ? { ...fallback.data, assigned_to: null, highlight_bullets: [], closing_paragraphs: [], logged_broadcast_id: null } : null;
+    data = fallback.data ? { ...fallback.data, assigned_to: null, highlight_bullets: [], closing_paragraphs: [], logged_broadcast_id: null, raw_html: null } : null;
     error = fallback.error;
   }
   if (error) throw error;

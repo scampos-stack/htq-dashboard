@@ -38,6 +38,11 @@ export type BroadcastDraftFormValues = {
   footerNoteText: string;
   footerNoteLinkText: string;
   footerNoteLinkUrl: string;
+  // Verbatim source HTML. When set, the preview and "Copy HTML for Keap"
+  // use this as-is instead of rebuilding from the fields above — lets any
+  // email shape (video thumbnails, numbered lists, custom buttons) go out
+  // exactly as designed, not just whatever the structured fields can hold.
+  rawHtml: string;
 };
 
 const EMPTY: BroadcastDraftFormValues = {
@@ -63,6 +68,7 @@ const EMPTY: BroadcastDraftFormValues = {
   footerNoteText: "",
   footerNoteLinkText: "",
   footerNoteLinkUrl: "",
+  rawHtml: "",
 };
 
 export function draftToFormValues(draft: BroadcastDraft): BroadcastDraftFormValues {
@@ -89,6 +95,7 @@ export function draftToFormValues(draft: BroadcastDraft): BroadcastDraftFormValu
     footerNoteText: draft.footerNoteText ?? "",
     footerNoteLinkText: draft.footerNoteLinkText ?? "",
     footerNoteLinkUrl: draft.footerNoteLinkUrl ?? "",
+    rawHtml: draft.rawHtml ?? "",
   };
 }
 
@@ -159,6 +166,7 @@ export function BroadcastDraftForm({
         footerNoteText: c.footerNoteText ?? f.footerNoteText,
         footerNoteLinkText: c.footerNoteLinkText ?? f.footerNoteLinkText,
         footerNoteLinkUrl: c.footerNoteLinkUrl ?? f.footerNoteLinkUrl,
+        rawHtml: html,
       }));
       return true;
     } catch (err) {
@@ -220,6 +228,7 @@ export function BroadcastDraftForm({
         footerNoteText: form.footerNoteText,
         footerNoteLinkText: form.footerNoteLinkText,
         footerNoteLinkUrl: form.footerNoteLinkUrl,
+        rawHtml: form.rawHtml,
       };
       const res = await fetch(isEdit ? `/api/broadcast-drafts/${draftId}` : "/api/broadcast-drafts", {
         method: isEdit ? "PATCH" : "POST",
@@ -399,6 +408,31 @@ export function BroadcastDraftForm({
           <input value={form.footerNoteLinkUrl} onChange={(e) => set("footerNoteLinkUrl", e.target.value)} className={inputClass} />
         )}
       </div>
+
+      <div className="mt-6 flex items-center justify-between gap-2">
+        <h4 className="text-xs font-bold uppercase tracking-wide text-body-gray">Source HTML (exact send)</h4>
+        {form.rawHtml && (
+          <button
+            type="button"
+            onClick={() => set("rawHtml", "")}
+            className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
+          >
+            Clear — rebuild from fields above
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-[11px] text-body-gray">
+        When this is filled in, the preview and &quot;Copy HTML for Keap&quot; use it exactly as-is — no
+        rebuilding from the fields above. Pasting or uploading HTML fills this automatically; edit it directly
+        here for anything the fields above can&apos;t represent (video thumbnails, numbered lists, custom
+        buttons, multi-paragraph footers).
+      </p>
+      <textarea
+        value={form.rawHtml}
+        onChange={(e) => set("rawHtml", e.target.value)}
+        placeholder="Paste or upload HTML above to fill this in, or paste it directly here."
+        className={`${inputClass} mt-2 min-h-[160px] font-mono text-xs`}
+      />
 
       <div className="mt-5 flex gap-2">
         <button
