@@ -157,20 +157,36 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
 
           <div className="mt-3">
             <p className="mb-1 text-[11px] font-semibold text-body-gray">
-              Image — reused from the email when one's found, or paste your own URL (there's no AI image
-              generation wired up here yet, so this is a manual link, not a generated visual):
+              Image — reused from the email when one's found, generated as an on-brand text card when
+              there isn't one, or paste your own URL:
             </p>
             {imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt="" className="mb-2 h-20 w-auto rounded border border-black/10" />
+              <img src={imageUrl} alt="" className="mb-2 h-32 w-auto rounded border border-black/10" />
             )}
-            <input
-              type="text"
-              value={imageUrl ?? ""}
-              onChange={(e) => setImageUrl(e.target.value || null)}
-              placeholder="https://… (leave blank to post without an image)"
-              className="w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={imageUrl ?? ""}
+                onChange={(e) => setImageUrl(e.target.value || null)}
+                placeholder="https://… (leave blank to post without an image)"
+                className="flex-1 rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const headline = content.split("\n").find((l) => l.trim())?.trim() ?? "Hometown Quotes";
+                  setImageUrl(`/api/linkedin-posts/brand-image?text=${encodeURIComponent(headline)}`);
+                }}
+                className="shrink-0 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
+              >
+                Generate branded visual
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] text-body-gray">
+              The generated card uses the post's first line as the headline — edit the post text above
+              first if you want different wording on it, then regenerate.
+            </p>
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
