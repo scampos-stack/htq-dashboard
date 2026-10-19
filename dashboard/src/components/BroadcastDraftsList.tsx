@@ -23,7 +23,13 @@ function groupDrafts(drafts: BroadcastDraft[]) {
   return [...groups.values()].sort((a, b) => a.targetDate.localeCompare(b.targetDate));
 }
 
-export function BroadcastDraftsList({ drafts }: { drafts: BroadcastDraft[] }) {
+export function BroadcastDraftsList({
+  drafts,
+  linkedInDraftIds,
+}: {
+  drafts: BroadcastDraft[];
+  linkedInDraftIds?: number[];
+}) {
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [merging, setMerging] = useState(false);
@@ -32,6 +38,7 @@ export function BroadcastDraftsList({ drafts }: { drafts: BroadcastDraft[] }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const groups = groupDrafts(drafts);
+  const hasLinkedInPost = new Set(linkedInDraftIds ?? []);
 
   function toggleSelect(id: number) {
     setSelected((prev) => {
@@ -178,6 +185,14 @@ export function BroadcastDraftsList({ drafts }: { drafts: BroadcastDraft[] }) {
                         )}
                       </div>
                       <div className="flex items-center gap-3">
+                        {hasLinkedInPost.has(d.id) && (
+                          <span
+                            title="A LinkedIn post has been generated from this draft"
+                            className="rounded-full bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700"
+                          >
+                            LinkedIn ✓
+                          </span>
+                        )}
                         {d.assignedTo && (
                           <span className="rounded-full bg-violet-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-violet-700">
                             {d.assignedTo}

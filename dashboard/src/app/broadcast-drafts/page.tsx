@@ -45,7 +45,16 @@ export default async function BroadcastDraftsPage({
         {channel === "linkedin" ? (
           <LinkedInPostsTable posts={await getLinkedInPosts()} />
         ) : (
-          <BroadcastDraftsList drafts={await getBroadcastDrafts(status)} />
+          <BroadcastDraftsList
+            // Sent drafts are history, not agenda — the Keap Broadcasts log
+            // on the main dashboard is where "already went out" lives. This
+            // page defaults to hiding them unless Sent is explicitly picked
+            // from the status filter.
+            drafts={(await getBroadcastDrafts(status)).filter((d) => status === "sent" || d.status !== "sent")}
+            linkedInDraftIds={(await getLinkedInPosts())
+              .map((p) => p.broadcastDraftId)
+              .filter((id): id is number => id != null)}
+          />
         )}
       </div>
     </div>

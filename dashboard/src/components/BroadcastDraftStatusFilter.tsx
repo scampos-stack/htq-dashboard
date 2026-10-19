@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { BroadcastDraftStatus } from "@/lib/data";
 
 const OPTIONS: { value: BroadcastDraftStatus | "all"; label: string }[] = [
-  { value: "all", label: "All statuses" },
+  { value: "all", label: "All (except Sent)" },
   { value: "not_started", label: "Not Started" },
   { value: "writing", label: "Writing" },
   { value: "review", label: "Review" },
