@@ -532,6 +532,53 @@ export async function getBroadcastDraft(id: number): Promise<BroadcastDraft | nu
   return data ? mapBroadcastDraftRow(data) : null;
 }
 
+export const LINKEDIN_ACCOUNTS = ["Paula", "Mohammed", "HTQ main"] as const;
+export type LinkedInAccount = (typeof LINKEDIN_ACCOUNTS)[number];
+export type LinkedInPostStatus = "draft" | "approved" | "scheduled" | "published";
+
+export type LinkedInPost = {
+  id: number;
+  broadcastDraftId: number | null;
+  content: string;
+  imageUrl: string | null;
+  account: string;
+  status: LinkedInPostStatus;
+  scheduledDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const LINKEDIN_POST_COLUMNS =
+  "id, broadcast_draft_id, content, image_url, account, status, scheduled_date, created_at, updated_at";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapLinkedInPostRow(r: any): LinkedInPost {
+  return {
+    id: r.id,
+    broadcastDraftId: r.broadcast_draft_id ?? null,
+    content: r.content,
+    imageUrl: r.image_url ?? null,
+    account: r.account,
+    status: r.status,
+    scheduledDate: r.scheduled_date ?? null,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export async function getLinkedInPosts(): Promise<LinkedInPost[]> {
+  const supabase = supabaseServer();
+  const { data, error } = await supabase
+    .from("linkedin_posts")
+    .select(LINKEDIN_POST_COLUMNS)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[data] linkedin_posts fetch failed (migration 035 pending?):", error.message);
+    return [];
+  }
+  return (data ?? []).map(mapLinkedInPostRow);
+}
+
 export type BroadcastDraftComment = {
   id: number;
   draftId: number;

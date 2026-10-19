@@ -791,3 +791,80 @@ export async function regenerateBroadcastDraftFromComment(
 
   return { generated: true, changedFields };
 }
+
+// Pulls the first "real" content image out of a draft's HTML to reuse as
+// the LinkedIn post's image — skips the company logo (always the first
+// image in the template) since that's branding, not content. Works against
+// both raw_html and the rebuilt structured-field HTML (neither currently
+// has any other img), so this covers both draft shapes.
+function extractContentImageUrl(html: string | null): string | null {
+  if (!html) return null;
+  const matches = [...html.matchAll(/<img[^>]*\ssrc=["']([^"']+)["']/gi)];
+  const nonLogo = matches.find((m) => !/logo/i.test(m[1]));
+  const url = (nonLogo ?? matches[1] ?? matches[0])?.[1] ?? null;
+  // A literal unreplaced placeholder (see migration 034's raw-HTML notes)
+  // isn't a usable image URL.
+  return url && /^https?:\/\//i.test(url) ? url : null;
+}
+
+// Rewrites an email draft into a standalone LinkedIn post — different
+// medium, so this isn't just "shorten the email": no subject line, no
+// "click the button" framing, speaks directly to the reader on their feed,
+// and ends with a single plain-text call to action (LinkedIn post bodies
+// don't render HTML, so no literal button/link markup).
+export async function generateLinkedInPostFromDraft(
+  draftId: number
+): Promise<{ generated: boolean; reason?: string; content?: string; imageUrl?: string | null }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { generated: false, reason: "ANTHROPIC_API_KEY not configured" };
+  }
+
+  const draft = await getBroadcastDraft(draftId);
+  if (!draft) {
+    return { generated: false, reason: "Draft not found" };
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: "claude-opus-5",
+    max_tokens: 2048,
+    output_config: { effort: "low" },
+    system:
+      "You turn a marketing email draft for an insurance-lead-generation " +
+      "company (Hometown Quotes) into a standalone LinkedIn post. This is a " +
+      "different medium, not a shortened email: no subject line, no " +
+      "\"click the button below\" framing, no email-only merge fields like " +
+      "~Contact.FirstName~ — write as a direct address to whoever is " +
+      "scrolling their feed. Ground the post in the email's actual content " +
+      "(the offer, the proof points, the value) — never invent claims the " +
+      "email doesn't make.\n\n" +
+      "Format: 3-6 short paragraphs or lines (LinkedIn rewards line breaks " +
+      "over dense blocks), under 1300 characters total, ending with one " +
+      "plain-text call to action sentence (LinkedIn posts don't render " +
+      "clickable buttons, so phrase it as a sentence, e.g. \"Link in the " +
+      "comments\" or a plain URL if the email's CTA URL is safe to share " +
+      "publicly). No markdown formatting, no hashtag spam (3 relevant " +
+      "hashtags at the end, maximum, only if they're genuinely relevant).\n\n" +
+      "Respond with ONLY the post text — no preamble, no markdown fences.",
+    messages: [
+      {
+        role: "user",
+        content:
+          "Here is the source email's content (JSON). Write the LinkedIn " +
+          "post:\n\n" + JSON.stringify(draftContentForPrompt(draft), null, 2),
+      },
+    ],
+  });
+
+  const textBlock = response.content.find(
+    (b): b is Anthropic.TextBlock => b.type === "text"
+  );
+  const content = textBlock?.text?.trim();
+  if (!content) {
+    return { generated: false, reason: "Claude returned no text content" };
+  }
+
+  const imageUrl = extractContentImageUrl(draft.rawHtml);
+  return { generated: true, content, imageUrl };
+}

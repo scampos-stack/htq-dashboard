@@ -7,6 +7,7 @@ import { renderBroadcastDraftHtml } from "@/lib/broadcast-draft-template";
 import { BroadcastDraftStatusSelect } from "@/components/BroadcastDraftStatusSelect";
 import { BroadcastDraftAssigneeSelect } from "@/components/BroadcastDraftAssigneeSelect";
 import { BroadcastDraftForm, draftToFormValues } from "@/components/BroadcastDraftForm";
+import { LinkedInPostPanel } from "@/components/LinkedInPostPanel";
 
 type PendingSelection = { text: string; x: number; y: number };
 
@@ -274,6 +275,7 @@ export function BroadcastDraftDetail({
             className="w-full rounded-lg border border-black/10"
             style={{ height: 800 }}
           />
+          <LinkedInPostPanel draftId={draft.id} />
         </div>
 
         <div className="rounded-3xl bg-white p-6 shadow-sm">
