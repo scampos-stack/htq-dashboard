@@ -23,6 +23,7 @@ function PostCard({ post }: { post: LinkedInPost }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
   const [content, setContent] = useState(post.content);
 
   async function patch(fields: Record<string, unknown>) {
@@ -105,8 +106,21 @@ function PostCard({ post }: { post: LinkedInPost }) {
 
       <div className="flex gap-3">
         {post.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.imageUrl} alt="" className="h-20 w-28 shrink-0 rounded-lg border border-black/10 object-cover" />
+          <div className="flex shrink-0 flex-col gap-1">
+            <button type="button" onClick={() => setZoomed(true)} className="cursor-zoom-in rounded-lg border border-black/10 p-0" title="Click to zoom">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={post.imageUrl} alt="" className="h-20 w-28 rounded-lg object-cover" />
+            </button>
+            <a
+              href={post.imageUrl}
+              download={`linkedin-post-${post.id}.png`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-center text-[10px] font-semibold text-sky-600 underline"
+            >
+              Download
+            </a>
+          </div>
         )}
         {editing ? (
           <div className="flex-1">
@@ -130,6 +144,36 @@ function PostCard({ post }: { post: LinkedInPost }) {
           <p className="flex-1 whitespace-pre-wrap text-sm text-charcoal">{post.content}</p>
         )}
       </div>
+
+      {zoomed && post.imageUrl && (
+        <div
+          onClick={() => setZoomed(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+        >
+          <div onClick={(e) => e.stopPropagation()} className="flex max-h-full max-w-full flex-col items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={post.imageUrl} alt="" className="max-h-[80vh] max-w-full rounded-lg object-contain" />
+            <div className="flex gap-3">
+              <a
+                href={post.imageUrl}
+                download={`linkedin-post-${post.id}.png`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-mist"
+              >
+                Download
+              </a>
+              <button
+                type="button"
+                onClick={() => setZoomed(false)}
+                className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-mist"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

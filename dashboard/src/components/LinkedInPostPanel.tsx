@@ -16,6 +16,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
   const [account, setAccount] = useState<string>(LINKEDIN_ACCOUNTS[2]);
   const [scheduledDate, setScheduledDate] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [zoomed, setZoomed] = useState(false);
 
   async function handleOpen() {
     setOpen(true);
@@ -161,8 +162,31 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
               there isn't one, or paste your own URL:
             </p>
             {imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt="" className="mb-2 h-32 w-auto rounded border border-black/10" />
+              <div className="mb-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setZoomed(true)}
+                  className="shrink-0 cursor-zoom-in rounded border border-black/10 p-0"
+                  title="Click to zoom"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imageUrl} alt="" className="h-32 w-auto rounded" />
+                </button>
+                <div className="flex flex-col gap-1">
+                  <button type="button" onClick={() => setZoomed(true)} className="text-left text-xs font-semibold text-sky-600 underline">
+                    Zoom
+                  </button>
+                  <a
+                    href={imageUrl}
+                    download={`linkedin-post-${draftId}.png`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-sky-600 underline"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
             )}
             <div className="flex gap-2">
               <input
@@ -232,6 +256,36 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
             </button>
           </div>
         </>
+      )}
+
+      {zoomed && imageUrl && (
+        <div
+          onClick={() => setZoomed(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+        >
+          <div onClick={(e) => e.stopPropagation()} className="flex max-h-full max-w-full flex-col items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt="" className="max-h-[80vh] max-w-full rounded-lg object-contain" />
+            <div className="flex gap-3">
+              <a
+                href={imageUrl}
+                download={`linkedin-post-${draftId}.png`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-mist"
+              >
+                Download
+              </a>
+              <button
+                type="button"
+                onClick={() => setZoomed(false)}
+                className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-mist"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
