@@ -19,6 +19,26 @@ const STATUS_STYLE: Record<LinkedInPostStatus, string> = {
   published: "bg-brand-green/15 text-brand-green-dark",
 };
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+}
+
+// Purely cosmetic — makes the icons read as LinkedIn chrome without
+// pulling in an icon library for four one-off glyphs.
+function EngagementIcon({ label }: { label: string }) {
+  return (
+    <div className="flex flex-1 items-center justify-center gap-1.5 py-2 text-xs font-semibold text-body-gray">
+      <span className="h-4 w-4 rounded-sm border-[1.5px] border-body-gray" />
+      {label}
+    </div>
+  );
+}
+
 function PostCard({ post }: { post: LinkedInPost }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -59,14 +79,17 @@ function PostCard({ post }: { post: LinkedInPost }) {
   }
 
   return (
-    <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <div className="rounded-2xl border border-black/5 bg-white shadow-sm">
+      {/* Admin controls — kept visually separate from the post mock below so
+          the mock reads as "what this will look like on LinkedIn," not as
+          part of the managed queue UI. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 bg-charcoal/[0.02] px-4 py-2">
         <div className="flex items-center gap-2">
           <select
             value={post.account}
             disabled={saving}
             onChange={(e) => patch({ account: e.target.value })}
-            className="rounded-lg border border-black/10 bg-white px-2 py-1 text-sm font-semibold text-charcoal disabled:opacity-60"
+            className="rounded-lg border border-black/10 bg-white px-2 py-1 text-xs font-semibold text-charcoal disabled:opacity-60"
           >
             {LINKEDIN_ACCOUNTS.map((a) => (
               <option key={a} value={a}>
@@ -95,6 +118,17 @@ function PostCard({ post }: { post: LinkedInPost }) {
           />
         </div>
         <div className="flex items-center gap-3">
+          {post.imageUrl && (
+            <a
+              href={post.imageUrl}
+              download={`linkedin-post-${post.id}.png`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-sky-600 underline"
+            >
+              Download image
+            </a>
+          )}
           <button onClick={() => setEditing((v) => !v)} className="text-xs font-semibold text-sky-600 underline">
             {editing ? "Cancel" : "Edit"}
           </button>
@@ -104,26 +138,26 @@ function PostCard({ post }: { post: LinkedInPost }) {
         </div>
       </div>
 
-      <div className="flex gap-3">
-        {post.imageUrl && (
-          <div className="flex shrink-0 flex-col gap-1">
-            <button type="button" onClick={() => setZoomed(true)} className="cursor-zoom-in rounded-lg border border-black/10 p-0" title="Click to zoom">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={post.imageUrl} alt="" className="h-20 w-28 rounded-lg object-cover" />
-            </button>
-            <a
-              href={post.imageUrl}
-              download={`linkedin-post-${post.id}.png`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-center text-[10px] font-semibold text-sky-600 underline"
-            >
-              Download
-            </a>
+      {/* LinkedIn post mock */}
+      <div className="mx-auto max-w-[552px] px-4 pb-1 pt-3">
+        <div className="mb-3 flex items-center gap-2.5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-green text-sm font-bold text-white">
+            {initials(post.account)}
           </div>
-        )}
+          <div>
+            <p className="text-sm font-semibold text-charcoal">{post.account}</p>
+            <p className="text-xs text-body-gray">Hometown Quotes</p>
+            <p className="text-xs text-body-gray">
+              {post.scheduledDate
+                ? new Date(post.scheduledDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                : "Not scheduled"}{" "}
+              · 🌐
+            </p>
+          </div>
+        </div>
+
         {editing ? (
-          <div className="flex-1">
+          <div>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -141,8 +175,27 @@ function PostCard({ post }: { post: LinkedInPost }) {
             </button>
           </div>
         ) : (
-          <p className="flex-1 whitespace-pre-wrap text-sm text-charcoal">{post.content}</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-charcoal">{post.content}</p>
         )}
+      </div>
+
+      {post.imageUrl && (
+        <button
+          type="button"
+          onClick={() => setZoomed(true)}
+          className="block w-full cursor-zoom-in border-t border-black/5 p-0"
+          title="Click to zoom"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={post.imageUrl} alt="" className="max-h-[420px] w-full object-cover" />
+        </button>
+      )}
+
+      <div className="mx-auto flex max-w-[552px] border-t border-black/5 px-2">
+        <EngagementIcon label="Like" />
+        <EngagementIcon label="Comment" />
+        <EngagementIcon label="Repost" />
+        <EngagementIcon label="Send" />
       </div>
 
       {zoomed && post.imageUrl && (
