@@ -17,10 +17,13 @@ export default async function BroadcastDraftsPage({
   searchParams: Promise<{ status?: string; channel?: string }>;
 }) {
   const params = await searchParams;
-  const channel = params.channel === "linkedin" ? "linkedin" : "email";
+  const channel = params.channel === "linkedin" || params.channel === "email" ? params.channel : "all";
   const status = VALID_STATUSES.includes(params.status as BroadcastDraftStatus)
     ? (params.status as BroadcastDraftStatus)
     : undefined;
+  // Needed for both the email list (LinkedIn-generated badge) and the
+  // LinkedIn list itself, so fetch once regardless of which channel(s) render.
+  const linkedInPosts = await getLinkedInPosts();
 
   return (
     <div className="flex-1 bg-mist">
@@ -35,26 +38,37 @@ export default async function BroadcastDraftsPage({
             <Suspense fallback={null}>
               <ScheduleChannelFilter />
             </Suspense>
-            {channel === "email" && (
+            {channel !== "linkedin" && (
               <Suspense fallback={null}>
                 <BroadcastDraftStatusFilter />
               </Suspense>
             )}
           </div>
         </div>
-        {channel === "linkedin" ? (
-          <LinkedInPostsTable posts={await getLinkedInPosts()} />
-        ) : (
-          <BroadcastDraftsList
-            // Sent drafts are history, not agenda — the Keap Broadcasts log
-            // on the main dashboard is where "already went out" lives. This
-            // page defaults to hiding them unless Sent is explicitly picked
-            // from the status filter.
-            drafts={(await getBroadcastDrafts(status)).filter((d) => status === "sent" || d.status !== "sent")}
-            linkedInDraftIds={(await getLinkedInPosts())
-              .map((p) => p.broadcastDraftId)
-              .filter((id): id is number => id != null)}
-          />
+
+        {channel !== "linkedin" && (
+          <div className={channel === "all" ? "mb-8" : undefined}>
+            {channel === "all" && (
+              <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-body-gray">Email (Keap)</h2>
+            )}
+            <BroadcastDraftsList
+              // Sent drafts are history, not agenda — the Keap Broadcasts log
+              // on the main dashboard is where "already went out" lives. This
+              // page defaults to hiding them unless Sent is explicitly picked
+              // from the status filter.
+              drafts={(await getBroadcastDrafts(status)).filter((d) => status === "sent" || d.status !== "sent")}
+              linkedInDraftIds={linkedInPosts.map((p) => p.broadcastDraftId).filter((id): id is number => id != null)}
+            />
+          </div>
+        )}
+
+        {channel !== "email" && (
+          <div>
+            {channel === "all" && (
+              <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-body-gray">LinkedIn</h2>
+            )}
+            <LinkedInPostsTable posts={linkedInPosts} />
+          </div>
         )}
       </div>
     </div>

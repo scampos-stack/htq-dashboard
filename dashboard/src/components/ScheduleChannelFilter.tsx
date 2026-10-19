@@ -2,7 +2,8 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 
-const OPTIONS: { value: "email" | "linkedin"; label: string }[] = [
+const OPTIONS: { value: "all" | "email" | "linkedin"; label: string }[] = [
+  { value: "all", label: "All channels" },
   { value: "email", label: "Email (Keap)" },
   { value: "linkedin", label: "LinkedIn" },
 ];
@@ -10,18 +11,21 @@ const OPTIONS: { value: "email" | "linkedin"; label: string }[] = [
 export function ScheduleChannelFilter() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const current = searchParams.get("channel") === "linkedin" ? "linkedin" : "email";
+  const raw = searchParams.get("channel");
+  const current = raw === "linkedin" || raw === "email" ? raw : "all";
 
   return (
     <select
       value={current}
       onChange={(e) => {
         const params = new URLSearchParams(searchParams.toString());
-        if (e.target.value === "email") {
+        if (e.target.value === "all") {
           params.delete("channel");
-          // Status filter only applies to the email list.
         } else {
           params.set("channel", e.target.value);
+        }
+        if (e.target.value !== "email") {
+          // Status filter only applies to the email list.
           params.delete("status");
         }
         router.push(`/broadcast-drafts?${params.toString()}`);
