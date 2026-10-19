@@ -39,12 +39,14 @@ function EngagementIcon({ label }: { label: string }) {
   );
 }
 
-function PostCard({ post }: { post: LinkedInPost }) {
+function PostCard({ post, defaultExpanded }: { post: LinkedInPost; defaultExpanded: boolean }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   const [content, setContent] = useState(post.content);
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [imgBroken, setImgBroken] = useState(false);
 
   async function patch(fields: Record<string, unknown>) {
     setSaving(true);
@@ -135,9 +137,35 @@ function PostCard({ post }: { post: LinkedInPost }) {
           <button onClick={handleDelete} disabled={saving} className="text-xs font-semibold text-red-600 underline disabled:opacity-50">
             Delete
           </button>
+          <button onClick={() => setExpanded((v) => !v)} className="text-xs font-semibold text-charcoal underline">
+            {expanded ? "Collapse ▲" : "Expand ▼"}
+          </button>
         </div>
       </div>
 
+      {!expanded ? (
+        <button
+          onClick={() => setExpanded(true)}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-charcoal/[0.02]"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-green text-xs font-bold text-white">
+            {initials(post.account)}
+          </div>
+          {post.imageUrl && !imgBroken && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={post.imageUrl}
+              alt=""
+              onError={() => setImgBroken(true)}
+              className="h-9 w-12 shrink-0 rounded object-cover"
+            />
+          )}
+          <p className="flex-1 truncate text-sm text-charcoal">
+            {post.content.split("\n").find((l) => l.trim()) ?? post.content}
+          </p>
+        </button>
+      ) : (
+        <>
       {/* LinkedIn post mock */}
       <div className="mx-auto max-w-[552px] px-4 pb-1 pt-3">
         <div className="mb-3 flex items-center gap-2.5">
@@ -179,16 +207,31 @@ function PostCard({ post }: { post: LinkedInPost }) {
         )}
       </div>
 
-      {post.imageUrl && (
-        <button
-          type="button"
-          onClick={() => setZoomed(true)}
-          className="block w-full cursor-zoom-in border-t border-black/5 p-0"
-          title="Click to zoom"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.imageUrl} alt="" className="max-h-[420px] w-full object-cover" />
-        </button>
+      {post.imageUrl && imgBroken ? (
+        <div className="border-t border-black/5 bg-charcoal/[0.03] px-4 py-3 text-xs text-body-gray">
+          Image didn&apos;t load —{" "}
+          <a href={post.imageUrl} target="_blank" rel="noreferrer" className="underline">
+            open it directly
+          </a>{" "}
+          to check the URL.
+        </div>
+      ) : (
+        post.imageUrl && (
+          <button
+            type="button"
+            onClick={() => setZoomed(true)}
+            className="block w-full cursor-zoom-in border-t border-black/5 p-0"
+            title="Click to zoom"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={post.imageUrl}
+              alt=""
+              onError={() => setImgBroken(true)}
+              className="max-h-[420px] w-full object-cover"
+            />
+          </button>
+        )
       )}
 
       <div className="mx-auto flex max-w-[552px] border-t border-black/5 px-2">
@@ -197,6 +240,8 @@ function PostCard({ post }: { post: LinkedInPost }) {
         <EngagementIcon label="Repost" />
         <EngagementIcon label="Send" />
       </div>
+      </>
+      )}
 
       {zoomed && post.imageUrl && (
         <div
@@ -243,7 +288,7 @@ export function LinkedInPostsTable({ posts }: { posts: LinkedInPost[] }) {
   return (
     <div className="flex flex-col gap-3">
       {posts.map((p) => (
-        <PostCard key={p.id} post={p} />
+        <PostCard key={p.id} post={p} defaultExpanded={posts.length === 1} />
       ))}
     </div>
   );

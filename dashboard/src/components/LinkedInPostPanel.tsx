@@ -17,6 +17,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
   const [scheduledDate, setScheduledDate] = useState("");
   const [feedback, setFeedback] = useState("");
   const [zoomed, setZoomed] = useState(false);
+  const [imgBroken, setImgBroken] = useState(false);
 
   async function handleOpen() {
     setOpen(true);
@@ -29,6 +30,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to generate post");
       setContent(data.content);
       setImageUrl(data.imageUrl ?? null);
+      setImgBroken(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate post");
     } finally {
@@ -161,7 +163,16 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
               Image — reused from the email when one's found, generated as an on-brand text card when
               there isn't one, or paste your own URL:
             </p>
-            {imageUrl && (
+            {imageUrl && imgBroken && (
+              <div className="mb-2 rounded-lg bg-charcoal/[0.03] px-3 py-2 text-xs text-body-gray">
+                Image didn&apos;t load —{" "}
+                <a href={imageUrl} target="_blank" rel="noreferrer" className="underline">
+                  open it directly
+                </a>{" "}
+                to check the URL, or clear it and try "Generate branded visual" instead.
+              </div>
+            )}
+            {imageUrl && !imgBroken && (
               <div className="mb-2 flex items-center gap-3">
                 <button
                   type="button"
@@ -170,7 +181,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
                   title="Click to zoom"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imageUrl} alt="" className="h-32 w-auto rounded" />
+                  <img src={imageUrl} alt="" onError={() => setImgBroken(true)} className="h-32 w-auto rounded" />
                 </button>
                 <div className="flex flex-col gap-1">
                   <button type="button" onClick={() => setZoomed(true)} className="text-left text-xs font-semibold text-sky-600 underline">
@@ -192,7 +203,10 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
               <input
                 type="text"
                 value={imageUrl ?? ""}
-                onChange={(e) => setImageUrl(e.target.value || null)}
+                onChange={(e) => {
+                  setImageUrl(e.target.value || null);
+                  setImgBroken(false);
+                }}
                 placeholder="https://… (leave blank to post without an image)"
                 className="flex-1 rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
               />
@@ -201,6 +215,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
                 onClick={() => {
                   const headline = content.split("\n").find((l) => l.trim())?.trim() ?? "Hometown Quotes";
                   setImageUrl(`/api/linkedin-posts/brand-image?text=${encodeURIComponent(headline)}`);
+                  setImgBroken(false);
                 }}
                 className="shrink-0 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
               >

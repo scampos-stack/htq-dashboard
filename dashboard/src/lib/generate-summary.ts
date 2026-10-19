@@ -793,15 +793,21 @@ export async function regenerateBroadcastDraftFromComment(
 }
 
 // Pulls the first "real" content image out of a draft's HTML to reuse as
-// the LinkedIn post's image — skips the company logo (always the first
-// image in the template) since that's branding, not content. Works against
-// both raw_html and the rebuilt structured-field HTML (neither currently
-// has any other img), so this covers both draft shapes.
+// the LinkedIn post's image. The first <img> is always the header/logo
+// across every HTQ template — sometimes literally named "logo", sometimes
+// (e.g. the Exclusive Calls header banner) just a hashed Keap file URL with
+// no "logo" in it — so it's skipped unconditionally rather than only when
+// its filename says "logo". A template with no image after that (plain
+// text emails like Exclusive Calls) has no content image to reuse, and
+// that's correctly reported as null rather than falling back to the
+// banner, which would crop into a near-blank thumbnail.
 function extractContentImageUrl(html: string | null): string | null {
   if (!html) return null;
   const matches = [...html.matchAll(/<img[^>]*\ssrc=["']([^"']+)["']/gi)];
-  const nonLogo = matches.find((m) => !/logo/i.test(m[1]));
-  const url = (nonLogo ?? matches[1] ?? matches[0])?.[1] ?? null;
+  const candidates = matches.slice(1);
+  if (candidates.length === 0) return null;
+  const nonLogo = candidates.find((m) => !/logo/i.test(m[1]));
+  const url = (nonLogo ?? candidates[0])?.[1] ?? null;
   // A literal unreplaced placeholder (see migration 034's raw-HTML notes)
   // isn't a usable image URL.
   return url && /^https?:\/\//i.test(url) ? url : null;
