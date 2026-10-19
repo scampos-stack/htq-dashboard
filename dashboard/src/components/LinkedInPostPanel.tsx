@@ -15,6 +15,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [account, setAccount] = useState<string>(LINKEDIN_ACCOUNTS[2]);
   const [scheduledDate, setScheduledDate] = useState("");
+  const [feedback, setFeedback] = useState("");
 
   async function handleOpen() {
     setOpen(true);
@@ -29,6 +30,33 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
       setImageUrl(data.imageUrl ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate post");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  // Regenerates the post text from feedback (e.g. "make it punchier", "lead
+  // with the stat instead") — keeps whatever image is currently set rather
+  // than touching it, since feedback here is about the copy.
+  async function handleRegenerate() {
+    if (!feedback.trim()) {
+      setError("Add a note on what to change first.");
+      return;
+    }
+    setError(null);
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/broadcast-drafts/${draftId}/linkedin-post`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedback, currentContent: content }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to regenerate post");
+      setContent(data.content);
+      setFeedback("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to regenerate post");
     } finally {
       setGenerating(false);
     }
@@ -106,26 +134,44 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
           />
           <p className="mt-1 text-[11px] text-body-gray">{content.length} characters</p>
 
-          {imageUrl ? (
-            <div className="mt-3">
-              <p className="mb-1 text-[11px] font-semibold text-body-gray">
-                Image reused from the email (clear to post without one):
-              </p>
-              <div className="flex items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageUrl} alt="" className="h-20 w-auto rounded border border-black/10" />
-                <button
-                  type="button"
-                  onClick={() => setImageUrl(null)}
-                  className="text-xs font-semibold text-body-gray underline"
-                >
-                  Remove image
-                </button>
-              </div>
+          <div className="mt-3 rounded-2xl border border-black/10 bg-charcoal/[0.02] p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-semibold text-body-gray">Feedback — tell it what to change</label>
             </div>
-          ) : (
-            <p className="mt-3 text-[11px] text-body-gray">No image found in the email to reuse.</p>
-          )}
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              placeholder="e.g. lead with the stat, make the CTA more direct, cut the second paragraph"
+              className="min-h-[60px] w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+              disabled={generating}
+            />
+            <button
+              type="button"
+              onClick={handleRegenerate}
+              disabled={generating || !feedback.trim()}
+              className="mt-2 rounded-full bg-sky-500 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-600 disabled:opacity-50"
+            >
+              {generating ? "Regenerating…" : "Regenerate with this feedback"}
+            </button>
+          </div>
+
+          <div className="mt-3">
+            <p className="mb-1 text-[11px] font-semibold text-body-gray">
+              Image — reused from the email when one's found, or paste your own URL (there's no AI image
+              generation wired up here yet, so this is a manual link, not a generated visual):
+            </p>
+            {imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl} alt="" className="mb-2 h-20 w-auto rounded border border-black/10" />
+            )}
+            <input
+              type="text"
+              value={imageUrl ?? ""}
+              onChange={(e) => setImageUrl(e.target.value || null)}
+              placeholder="https://… (leave blank to post without an image)"
+              className="w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+            />
+          </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-xs font-semibold text-body-gray">

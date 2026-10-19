@@ -813,7 +813,8 @@ function extractContentImageUrl(html: string | null): string | null {
 // and ends with a single plain-text call to action (LinkedIn post bodies
 // don't render HTML, so no literal button/link markup).
 export async function generateLinkedInPostFromDraft(
-  draftId: number
+  draftId: number,
+  revision?: { feedback: string; currentContent: string }
 ): Promise<{ generated: boolean; reason?: string; content?: string; imageUrl?: string | null }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -846,13 +847,24 @@ export async function generateLinkedInPostFromDraft(
       "comments\" or a plain URL if the email's CTA URL is safe to share " +
       "publicly). No markdown formatting, no hashtag spam (3 relevant " +
       "hashtags at the end, maximum, only if they're genuinely relevant).\n\n" +
-      "Respond with ONLY the post text — no preamble, no markdown fences.",
+      (revision
+        ? "You are revising a post you already wrote, based on human " +
+          "feedback — keep what the feedback doesn't ask to change, and " +
+          "apply only what it asks for."
+        : "") +
+      "\n\nRespond with ONLY the post text — no preamble, no markdown fences.",
     messages: [
       {
         role: "user",
-        content:
-          "Here is the source email's content (JSON). Write the LinkedIn " +
-          "post:\n\n" + JSON.stringify(draftContentForPrompt(draft), null, 2),
+        content: revision
+          ? "Here is the source email's content (JSON) and the LinkedIn " +
+            "post version you wrote from it. Revise it per the feedback " +
+            "below.\n\nSource email:\n" +
+            JSON.stringify(draftContentForPrompt(draft), null, 2) +
+            `\n\nCurrent post:\n${revision.currentContent}` +
+            `\n\nFeedback: "${revision.feedback}"`
+          : "Here is the source email's content (JSON). Write the LinkedIn " +
+            "post:\n\n" + JSON.stringify(draftContentForPrompt(draft), null, 2),
       },
     ],
   });
