@@ -149,7 +149,10 @@ export function BroadcastDraftsList({
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="font-heading text-base font-semibold text-charcoal">{g.campaignTheme}</h3>
                 <span className="text-xs text-body-gray">
-                  {new Date(g.targetDate + "T00:00:00").toLocaleDateString(undefined, {
+                  {/* Pinned "en-US" so this reads consistently regardless of
+                      the viewer's own system locale (otherwise renders in
+                      Spanish/etc. for some viewers). */}
+                  {new Date(g.targetDate + "T00:00:00").toLocaleDateString("en-US", {
                     weekday: "short",
                     month: "short",
                     day: "numeric",

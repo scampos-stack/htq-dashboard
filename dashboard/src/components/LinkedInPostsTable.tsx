@@ -39,7 +39,7 @@ function EngagementIcon({ label }: { label: string }) {
   );
 }
 
-function PostRow({ post }: { post: LinkedInPost }) {
+export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -278,7 +278,7 @@ export function LinkedInPostsTable({ posts }: { posts: LinkedInPost[] }) {
   return (
     <div className="rounded-3xl border-l-4 border-sky-500 bg-white shadow-sm">
       {posts.map((p) => (
-        <PostRow key={p.id} post={p} />
+        <LinkedInPostRow key={p.id} post={p} />
       ))}
     </div>
   );
