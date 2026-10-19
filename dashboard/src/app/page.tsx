@@ -876,7 +876,7 @@ export default async function Home({
               Marketing Schedule
             </Link>
             <Link
-              href="/linkedin-posts"
+              href="/broadcast-drafts?channel=linkedin"
               className="rounded-full border border-black/10 bg-white px-5 py-2.5 text-sm font-semibold text-charcoal shadow-sm transition-colors hover:bg-charcoal/5"
             >
               LinkedIn Queue

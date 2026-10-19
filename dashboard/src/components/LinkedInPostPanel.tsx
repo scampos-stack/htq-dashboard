@@ -123,7 +123,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
       ) : saved ? (
         <p className="text-sm font-semibold text-brand-green-dark">
           ✓ Saved to the LinkedIn queue. View it on the{" "}
-          <a href="/linkedin-posts" className="underline">
+          <a href="/broadcast-drafts?channel=linkedin" className="underline">
             LinkedIn Queue
           </a>{" "}
           page.
