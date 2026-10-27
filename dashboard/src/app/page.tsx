@@ -587,8 +587,17 @@ function VipSubmissionsWidget({
   return <VipSubmissionsTable submissions={submissions} ownerOptions={ownerOptions} />;
 }
 
+// Keyed by the `source` value the booked-call webhook derives from each
+// Bookings page's event subject (see sourceFromEventSubject in
+// /api/webhooks/booked-call) — the label names both the channel and the
+// actual Bookings event/page it came from, so this stays legible as more
+// sources get added.
 const WEBHOOK_SOURCE_LABELS: Record<string, string> = {
-  microsoft_link: "Microsoft Link (self-booked)",
+  email_marketing: "Email Marketing (15-minute HTQ Discovery)",
+  happen_media: "Happen Media + HTQ",
+  website: "HTQ Website",
+  linkedin: "HTQ LinkedIn",
+  microsoft_link: "Microsoft Link (self-booked, pre-source-tracking)",
   agent_call_in: "Agent Call-In",
 };
 
@@ -623,7 +632,7 @@ function BookedCallsSummary({
     <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
       <DonutChart
         title="Booked Calls by Source"
-        description={`15-minute HTQ Discovery calls booked in ${rangeLabel}, across both sources.${topCarrierNote}`}
+        description={`Calls booked in ${rangeLabel}, across all Bookings pages and Channel Blend.${topCarrierNote}`}
         segments={bookedCallsBySource.map((r) => ({ label: r.label, value: r.count }))}
       />
       <HorizontalBarList

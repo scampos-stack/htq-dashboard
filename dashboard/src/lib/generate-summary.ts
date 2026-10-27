@@ -813,6 +813,26 @@ function extractContentImageUrl(html: string | null): string | null {
   return url && /^https?:\/\//i.test(url) ? url : null;
 }
 
+// A LinkedIn post needs its own booking link, not whatever link the source
+// email used — bookings are attributed by which Microsoft Bookings page
+// was used (see the booked-call webhook's subject matching), so a booking
+// made from a LinkedIn post has to go through the LinkedIn-tagged page to
+// be counted as LinkedIn-sourced instead of landing under whichever
+// source the email's own link belongs to.
+const HTQ_LINKEDIN_BOOKING_URL =
+  "https://bookings.cloud.microsoft/book/HTQLinkedIn@HometownQuotes.onmicrosoft.com/?ismsaljsauthenabled=true";
+
+// Only swaps the link when the source email's CTA actually was a booking
+// link — an evergreen/blog email's CTA (e.g. "Read the full article") has
+// nothing to do with booking a call, so that link is left as-is.
+function contentForLinkedInPrompt(draft: BroadcastDraft) {
+  const content = draftContentForPrompt(draft);
+  if (typeof content.ctaUrl === "string" && /bookings\.cloud\.microsoft\/book\//i.test(content.ctaUrl)) {
+    content.ctaUrl = HTQ_LINKEDIN_BOOKING_URL;
+  }
+  return content;
+}
+
 // Rewrites an email draft into a standalone LinkedIn post — different
 // medium, so this isn't just "shorten the email": no subject line, no
 // "click the button" framing, speaks directly to the reader on their feed,
@@ -850,9 +870,10 @@ export async function generateLinkedInPostFromDraft(
       "over dense blocks), under 1300 characters total, ending with one " +
       "plain-text call to action sentence (LinkedIn posts don't render " +
       "clickable buttons, so phrase it as a sentence, e.g. \"Link in the " +
-      "comments\" or a plain URL if the email's CTA URL is safe to share " +
-      "publicly). No markdown formatting, no hashtag spam (3 relevant " +
-      "hashtags at the end, maximum, only if they're genuinely relevant).\n\n" +
+      "comments\" or a plain URL if the email's ctaUrl is safe to share " +
+      "publicly — use that exact URL verbatim, never invent or alter it). " +
+      "No markdown formatting, no hashtag spam (3 relevant hashtags at the " +
+      "end, maximum, only if they're genuinely relevant).\n\n" +
       (revision
         ? "You are revising a post you already wrote, based on human " +
           "feedback — keep what the feedback doesn't ask to change, and " +
@@ -866,11 +887,11 @@ export async function generateLinkedInPostFromDraft(
           ? "Here is the source email's content (JSON) and the LinkedIn " +
             "post version you wrote from it. Revise it per the feedback " +
             "below.\n\nSource email:\n" +
-            JSON.stringify(draftContentForPrompt(draft), null, 2) +
+            JSON.stringify(contentForLinkedInPrompt(draft), null, 2) +
             `\n\nCurrent post:\n${revision.currentContent}` +
             `\n\nFeedback: "${revision.feedback}"`
           : "Here is the source email's content (JSON). Write the LinkedIn " +
-            "post:\n\n" + JSON.stringify(draftContentForPrompt(draft), null, 2),
+            "post:\n\n" + JSON.stringify(contentForLinkedInPrompt(draft), null, 2),
       },
     ],
   });
