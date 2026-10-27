@@ -11,7 +11,7 @@ const OPTIONS = [
 export function RangeSelect() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const current = searchParams.get("range") ?? "all";
+  const current = searchParams.get("range") ?? "30";
 
   return (
     <select

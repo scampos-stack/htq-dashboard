@@ -667,7 +667,10 @@ export default async function Home({
   searchParams,
 }: PageProps<"/">) {
   const params = await searchParams;
-  const rangeParam = typeof params.range === "string" ? params.range : "all";
+  // Defaults to 30 days, not all-time — all-time dragged in stale/closed
+  // items (e.g. finished Channel Blend campaigns) that are just noise once
+  // they're done; "All time" is still one click away via RangeSelect.
+  const rangeParam = typeof params.range === "string" ? params.range : "30";
   const arrangementParam =
     typeof params.arrangement === "string" ? params.arrangement : "overview";
   // Defaults to Published only — Sam's review flagged unpublished
