@@ -7,40 +7,32 @@ import { supabaseServer } from "@/lib/supabase-server";
 // point the Make scenario's HTTP module at:
 // https://<your-domain>/api/webhooks/booked-call?secret=<value>
 
-// Paula's team added a custom Bookings question ("How are you booking?" —
-// Self-Booked / Call-In) whose answer lands in the calendar event's raw
-// HTML body under a "Custom Fields" section, e.g. "Answer- Call-In" or
-// "Answer - Call-In" — confirmed live the dash spacing isn't consistent
-// between bookings, so it's tolerated here rather than assumed. Only
-// applies to the old-shape payload where eventBody is still the full HTML
-// (see sourceFromOrganizerEmail below for the current shape).
-function sourceFromEventBody(eventBody: unknown): string {
-  if (typeof eventBody !== "string") return "microsoft_link";
-  const match = eventBody.match(/How are you booking\?[\s\S]{0,80}?Answer\s*-\s*([^<\r\n]+)/i);
-  const answer = match?.[1]?.trim().toLowerCase();
-  if (!answer) return "microsoft_link";
-  if (answer.includes("call")) return "agent_call_in";
-  return "microsoft_link";
+// `source` and `how_booked` answer two different questions and both come
+// out of the same `eventBody` field, which the Make scenario maps as
+// "{{2.organizer.emailAddress.address}}|||{{2.body.content}}" (no schema
+// edit needed — just that one formula in the existing field) so both
+// pieces travel together without a second body field. Older payload shapes
+// are still supported: a bare email with no "|||" (the brief window where
+// eventBody carried only the organizer), or the full HTML body alone (the
+// original shape, pre-page-tracking).
+const EVENT_BODY_DELIMITER = "|||";
+
+function splitEventBody(eventBody: unknown): { organizerEmail: string | null; html: string | null } {
+  if (typeof eventBody !== "string") return { organizerEmail: null, html: null };
+  if (eventBody.includes(EVENT_BODY_DELIMITER)) {
+    const [org, ...rest] = eventBody.split(EVENT_BODY_DELIMITER);
+    return { organizerEmail: org.trim() || null, html: rest.join(EVENT_BODY_DELIMITER).trim() || null };
+  }
+  if (eventBody.includes("<")) return { organizerEmail: null, html: eventBody };
+  return { organizerEmail: eventBody.trim() || null, html: null };
 }
 
-// All four Microsoft Bookings pages (Email Marketing, Happen Media,
-// Website, LinkedIn) share the same "Service name" ("15-minute HTQ
-// Discovery"), so the calendar event's subject is IDENTICAL no matter
-// which page was used — confirmed live on 2026-10-27: a booking made
-// through the HTQ LinkedIn page still came through with subject
-// "15-minute HTQ Discovery - <name>". Subject can't distinguish them.
-// What's actually different is the event's organizer — each Bookings page
-// is its own Microsoft 365 "booking business" with its own mailbox, which
-// Graph surfaces as organizer.emailAddress.address (e.g.
-// HTQLinkedIn@HometownQuotes.onmicrosoft.com).
-//
-// The Make scenario maps {{2.organizer.emailAddress.address}} into the
-// `eventBody` field (reusing it rather than adding a new field to the
-// shared data structure) — so a bare email address there means "this is
-// the organizer," while the old HTML body (containing "<") still means
-// "run the self-booked/call-in detection instead." Both shapes are
-// supported; `bookingOrganizerEmail` is also checked first in case that
-// gets wired up as a proper separate field later.
+// Each Bookings page (Email Marketing, Happen Media, Website, LinkedIn) is
+// its own Microsoft 365 "booking business" with its own mailbox — the
+// event's organizer — which is the only reliable way to tell them apart:
+// confirmed live on 2026-10-27 that all four share the same "Service name"
+// ("15-minute HTQ Discovery"), so the calendar event's subject is
+// identical no matter which page was used.
 const ORGANIZER_EMAIL_SOURCES: Record<string, string> = {
   "htqdiscoverycall@hometownquotes.onmicrosoft.com": "email_marketing",
   "hometownquoteshappenmedia@hometownquotes.onmicrosoft.com": "happen_media",
@@ -48,17 +40,26 @@ const ORGANIZER_EMAIL_SOURCES: Record<string, string> = {
   "htqlinkedin@hometownquotes.onmicrosoft.com": "linkedin",
 };
 
-function sourceFromOrganizerEmail(organizerEmail: unknown): string | null {
-  if (typeof organizerEmail !== "string") return null;
-  return ORGANIZER_EMAIL_SOURCES[organizerEmail.trim().toLowerCase()] ?? null;
+function sourceFromOrganizerEmail(organizerEmail: string | null): string | null {
+  if (!organizerEmail) return null;
+  return ORGANIZER_EMAIL_SOURCES[organizerEmail.toLowerCase()] ?? null;
 }
 
-// `eventBody` currently carries the organizer email (a bare address, no
-// "<") rather than the full HTML calendar body — only treat it as HTML
-// (and worth running the self-booked/call-in regex on) when it actually
-// looks like HTML.
-function looksLikeHtml(value: unknown): value is string {
-  return typeof value === "string" && value.includes("<");
+// Paula's team added a custom Bookings question ("How are you booking?" —
+// Self-Booked / Call-In), present on every Bookings page, not just one —
+// so it's a separate axis from `source` (which page), not a substitute for
+// it. The answer lands in the calendar event's raw HTML body under a
+// "Custom Fields" section, e.g. "Answer- Call-In" or "Answer - Call-In" —
+// confirmed live the dash spacing isn't consistent between bookings, so
+// it's tolerated here rather than assumed.
+function howBookedFromHtml(html: string | null): string | null {
+  if (!html) return null;
+  const match = html.match(/How are you booking\?[\s\S]{0,80}?Answer\s*-\s*([^<\r\n]+)/i);
+  const answer = match?.[1]?.trim().toLowerCase();
+  if (!answer) return null;
+  if (answer.includes("call")) return "call_in";
+  if (answer.includes("self")) return "self_booked";
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -75,22 +76,20 @@ export async function POST(req: Request) {
     const contactEmail = body.contactEmail ?? body.email ?? null;
     const eventSubject = body.eventSubject ?? body.subject ?? null;
     const scheduledAt = body.scheduledAt ?? body.startDateTime ?? body.start ?? null;
-    // An explicit source (if ever sent) wins. Otherwise, which of the four
-    // Bookings pages this came from — identified by the event's organizer
-    // mailbox, whether that arrived in the dedicated field or (today) in
-    // `eventBody` — is the more specific signal; the "How are you
-    // booking?" custom-question answer (self-booked vs. called in) is a
-    // fallback for events whose body is still the full HTML.
-    const source =
-      body.source ||
-      sourceFromOrganizerEmail(body.bookingOrganizerEmail) ||
-      (!looksLikeHtml(body.eventBody) ? sourceFromOrganizerEmail(body.eventBody) : null) ||
-      sourceFromEventBody(body.eventBody);
+    const { organizerEmail, html } = splitEventBody(body.eventBody);
+
+    // An explicit value (if ever sent) wins for either field; otherwise
+    // each is derived independently from its own signal — which Bookings
+    // page (organizer) has nothing to do with how the booking was made
+    // (the custom question), so neither should fall back to the other.
+    const source = body.source || sourceFromOrganizerEmail(body.bookingOrganizerEmail) || sourceFromOrganizerEmail(organizerEmail) || "unknown";
+    const howBooked = body.howBooked || howBookedFromHtml(html) || null;
 
     const supabase = supabaseServer();
     const { error } = await supabase.from("booked_calls").upsert(
       {
         source,
+        how_booked: howBooked,
         external_event_id: externalEventId ? String(externalEventId) : null,
         contact_name: contactName,
         contact_email: contactEmail,

@@ -28,6 +28,7 @@ import {
   getWoodpeckerAiSummary,
   getWoodpeckerSentiment,
   getWebhookBookedCallsBySource,
+  getBookedCallsByHowBooked,
   getChannelBlendAppointmentsCount,
   getBookedCallsByCarrier,
 } from "@/lib/data";
@@ -588,28 +589,38 @@ function VipSubmissionsWidget({
 }
 
 // Keyed by the `source` value the booked-call webhook derives from each
-// Bookings page's event subject (see sourceFromEventSubject in
-// /api/webhooks/booked-call) — the label names both the channel and the
-// actual Bookings event/page it came from, so this stays legible as more
-// sources get added.
+// Bookings page's organizer mailbox (see sourceFromOrganizerEmail in
+// /api/webhooks/booked-call) — WHICH page was used. A separate question
+// from "how" (see HOW_BOOKED_LABELS below) — "unknown" covers calls
+// booked before per-page tracking existed, where that's genuinely not
+// knowable rather than a guess.
 const WEBHOOK_SOURCE_LABELS: Record<string, string> = {
   email_marketing: "Email Marketing (15-minute HTQ Discovery)",
   happen_media: "Happen Media + HTQ",
   website: "HTQ Website",
   linkedin: "HTQ LinkedIn",
-  microsoft_link: "Microsoft Link (self-booked, pre-source-tracking)",
-  agent_call_in: "Agent Call-In",
+  unknown: "Unknown (pre-source-tracking)",
+};
+
+// Keyed by `how_booked` — self-booked online vs. an agent called in on
+// someone's behalf, from the same custom Bookings question on every page.
+const HOW_BOOKED_LABELS: Record<string, string> = {
+  self_booked: "Self-Booked",
+  call_in: "Agent Call-In",
+  unknown: "Unknown",
 };
 
 function BookedCallsSummary({
   rangeParam,
   channelBlendAppointmentsCount,
   webhookBookedCallsBySource,
+  bookedCallsByHowBooked,
   bookedCallsByCarrier,
 }: {
   rangeParam: string;
   channelBlendAppointmentsCount: number;
   webhookBookedCallsBySource: Awaited<ReturnType<typeof getWebhookBookedCallsBySource>>;
+  bookedCallsByHowBooked: Awaited<ReturnType<typeof getBookedCallsByHowBooked>>;
   bookedCallsByCarrier: Awaited<ReturnType<typeof getBookedCallsByCarrier>>;
 }) {
   const rangeLabel = rangeParam === "all" ? "all time" : `the last ${rangeParam} days`;
@@ -629,11 +640,19 @@ function BookedCallsSummary({
       ? ` Top carrier: ${bookedCallsByCarrier[0].carrier} (${bookedCallsByCarrier[0].count.toLocaleString()}).`
       : "";
   return (
-    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
       <DonutChart
         title="Booked Calls by Source"
-        description={`Calls booked in ${rangeLabel}, across all Bookings pages and Channel Blend.${topCarrierNote}`}
+        description={`Which Bookings page (or Channel Blend) was used, in ${rangeLabel}.${topCarrierNote}`}
         segments={bookedCallsBySource.map((r) => ({ label: r.label, value: r.count }))}
+      />
+      <DonutChart
+        title="How Did You Book?"
+        description={`Self-booked online vs. an agent call-in, in ${rangeLabel} — tracked on every Bookings page, independent of which one was used.`}
+        segments={bookedCallsByHowBooked.map((r) => ({
+          label: HOW_BOOKED_LABELS[r.howBooked] ?? r.howBooked,
+          value: r.count,
+        }))}
       />
       <HorizontalBarList
         title="Booked Calls by Carrier"
@@ -744,6 +763,7 @@ export default async function Home({
     rangeTotals,
     volumeTrend,
     webhookBookedCallsBySource,
+    bookedCallsByHowBooked,
     channelBlendAppointmentsCount,
     bookedCallsByCarrier,
     csatMonthlyTrend,
@@ -778,6 +798,7 @@ export default async function Home({
     rangeParam === "all" ? null : getDailyRangeTotals(Number(rangeParam)),
     getDailyVolumeTrend(rangeParam === "all" ? 30 : Number(rangeParam)),
     getWebhookBookedCallsBySource(rangeParam === "all" ? undefined : Number(rangeParam)),
+    getBookedCallsByHowBooked(rangeParam === "all" ? undefined : Number(rangeParam)),
     getChannelBlendAppointmentsCount(rangeParam === "all" ? undefined : Number(rangeParam)),
     getBookedCallsByCarrier(rangeParam === "all" ? undefined : Number(rangeParam)),
     getZendeskCsatMonthlyTrend(),
@@ -849,6 +870,7 @@ export default async function Home({
             rangeParam={rangeParam}
             channelBlendAppointmentsCount={channelBlendAppointmentsCount}
             webhookBookedCallsBySource={webhookBookedCallsBySource}
+            bookedCallsByHowBooked={bookedCallsByHowBooked}
             bookedCallsByCarrier={bookedCallsByCarrier}
           />
         );
@@ -926,6 +948,7 @@ export default async function Home({
                   rangeParam={rangeParam}
                   channelBlendAppointmentsCount={channelBlendAppointmentsCount}
                   webhookBookedCallsBySource={webhookBookedCallsBySource}
+                  bookedCallsByHowBooked={bookedCallsByHowBooked}
                   bookedCallsByCarrier={bookedCallsByCarrier}
                 />
                 <AllSourcesDigestCard digest={allSourcesDigest} />

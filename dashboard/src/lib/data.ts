@@ -183,14 +183,15 @@ export async function getBookedCallsByCarrier(
 // Booked calls today come from Channel Blend's own "Appointments" upload
 // category (see getChannelBlendAppointmentsCount), plus this table — fed by
 // the Make.com scenario that watches Paula's Microsoft 365 calendar for the
-// 15-minute HTQ Discovery link. Within that table, `source` splits further:
-// "microsoft_link" (self-booked) vs "agent_call_in" (booked by a rep after
-// a phone transfer), derived from a custom Bookings question — see
-// sourceFromEventBody in the webhook route. `days` filters to calls booked
-// (not scheduled to happen) in that window, matching the Overview page's
-// shared range selector — omit for all-time. Returns an empty breakdown
-// rather than throwing if migration 021 hasn't run yet — this is additive
-// display data, not worth crashing the whole dashboard's Promise.all over.
+// 15-minute HTQ Discovery link. `source` is WHICH of the four Bookings
+// pages was used (email_marketing/happen_media/website/linkedin, or
+// "unknown" for calls booked before per-page tracking existed) — see
+// sourceFromOrganizerEmail in the webhook route. `days` filters to calls
+// booked (not scheduled to happen) in that window, matching the Overview
+// page's shared range selector — omit for all-time. Returns an empty
+// breakdown rather than throwing if migration 021 hasn't run yet — this is
+// additive display data, not worth crashing the whole dashboard's
+// Promise.all over.
 export async function getWebhookBookedCallsBySource(
   days?: number
 ): Promise<{ source: string; count: number }[]> {
@@ -211,6 +212,36 @@ export async function getWebhookBookedCallsBySource(
     bySource.set(r.source, (bySource.get(r.source) ?? 0) + 1);
   }
   return [...bySource.entries()].map(([source, count]) => ({ source, count }));
+}
+
+// A separate axis from `source` above — HOW the call was booked
+// (self-booked online vs. an agent called in), from the same custom
+// Bookings question on every page, independent of which page was used.
+// `how_booked` is null for calls where the answer couldn't be parsed —
+// grouped under "Unknown" rather than dropped, so the total still
+// reconciles with the Booked Calls by Source chart. Empty breakdown
+// (not a throw) if migration 036 hasn't run yet, same reasoning as above.
+export async function getBookedCallsByHowBooked(
+  days?: number
+): Promise<{ howBooked: string; count: number }[]> {
+  const supabase = supabaseServer();
+  let query = supabase.from("booked_calls").select("how_booked");
+  if (days != null) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    query = query.gte("created_at", since.toISOString());
+  }
+  const { data, error } = await query;
+  if (error) {
+    console.error("[data] booked_calls how_booked breakdown failed (migration 036 pending?):", error.message);
+    return [];
+  }
+  const byHowBooked = new Map<string, number>();
+  for (const r of data ?? []) {
+    const key = r.how_booked ?? "unknown";
+    byHowBooked.set(key, (byHowBooked.get(key) ?? 0) + 1);
+  }
+  return [...byHowBooked.entries()].map(([howBooked, count]) => ({ howBooked, count }));
 }
 
 export type ChannelBlendCategoryPattern = {
