@@ -11,7 +11,9 @@ import { supabaseServer } from "@/lib/supabase-server";
 // Self-Booked / Call-In) whose answer lands in the calendar event's raw
 // HTML body under a "Custom Fields" section, e.g. "Answer- Call-In" or
 // "Answer - Call-In" — confirmed live the dash spacing isn't consistent
-// between bookings, so it's tolerated here rather than assumed.
+// between bookings, so it's tolerated here rather than assumed. Only
+// applies to the old-shape payload where eventBody is still the full HTML
+// (see sourceFromOrganizerEmail below for the current shape).
 function sourceFromEventBody(eventBody: unknown): string {
   if (typeof eventBody !== "string") return "microsoft_link";
   const match = eventBody.match(/How are you booking\?[\s\S]{0,80}?Answer\s*-\s*([^<\r\n]+)/i);
@@ -30,10 +32,15 @@ function sourceFromEventBody(eventBody: unknown): string {
 // What's actually different is the event's organizer — each Bookings page
 // is its own Microsoft 365 "booking business" with its own mailbox, which
 // Graph surfaces as organizer.emailAddress.address (e.g.
-// HTQLinkedIn@HometownQuotes.onmicrosoft.com). The Make HTTP module needs
-// {{2.organizer.emailAddress.address}} mapped into a bookingOrganizerEmail
-// field for this to work — see the webhook's own comment below if that
-// field is ever missing.
+// HTQLinkedIn@HometownQuotes.onmicrosoft.com).
+//
+// The Make scenario maps {{2.organizer.emailAddress.address}} into the
+// `eventBody` field (reusing it rather than adding a new field to the
+// shared data structure) — so a bare email address there means "this is
+// the organizer," while the old HTML body (containing "<") still means
+// "run the self-booked/call-in detection instead." Both shapes are
+// supported; `bookingOrganizerEmail` is also checked first in case that
+// gets wired up as a proper separate field later.
 const ORGANIZER_EMAIL_SOURCES: Record<string, string> = {
   "htqdiscoverycall@hometownquotes.onmicrosoft.com": "email_marketing",
   "hometownquoteshappenmedia@hometownquotes.onmicrosoft.com": "happen_media",
@@ -44,6 +51,14 @@ const ORGANIZER_EMAIL_SOURCES: Record<string, string> = {
 function sourceFromOrganizerEmail(organizerEmail: unknown): string | null {
   if (typeof organizerEmail !== "string") return null;
   return ORGANIZER_EMAIL_SOURCES[organizerEmail.trim().toLowerCase()] ?? null;
+}
+
+// `eventBody` currently carries the organizer email (a bare address, no
+// "<") rather than the full HTML calendar body — only treat it as HTML
+// (and worth running the self-booked/call-in regex on) when it actually
+// looks like HTML.
+function looksLikeHtml(value: unknown): value is string {
+  return typeof value === "string" && value.includes("<");
 }
 
 export async function POST(req: Request) {
@@ -62,13 +77,14 @@ export async function POST(req: Request) {
     const scheduledAt = body.scheduledAt ?? body.startDateTime ?? body.start ?? null;
     // An explicit source (if ever sent) wins. Otherwise, which of the four
     // Bookings pages this came from — identified by the event's organizer
-    // mailbox — is the more specific signal; the "How are you booking?"
-    // custom-question answer (self-booked vs. called in) is a fallback for
-    // events sent before bookingOrganizerEmail was wired up in Make, or
-    // that otherwise don't match a known organizer.
+    // mailbox, whether that arrived in the dedicated field or (today) in
+    // `eventBody` — is the more specific signal; the "How are you
+    // booking?" custom-question answer (self-booked vs. called in) is a
+    // fallback for events whose body is still the full HTML.
     const source =
       body.source ||
       sourceFromOrganizerEmail(body.bookingOrganizerEmail) ||
+      (!looksLikeHtml(body.eventBody) ? sourceFromOrganizerEmail(body.eventBody) : null) ||
       sourceFromEventBody(body.eventBody);
 
     const supabase = supabaseServer();
