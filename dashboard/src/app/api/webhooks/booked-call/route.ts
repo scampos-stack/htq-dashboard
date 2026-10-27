@@ -22,27 +22,28 @@ function sourceFromEventBody(eventBody: unknown): string {
 }
 
 // All four Microsoft Bookings pages (Email Marketing, Happen Media,
-// Website, LinkedIn) write events onto the same shared calendar that the
-// single Make scenario watches — they're told apart by the Bookings
-// service/event name baked into each page, which Bookings always includes
-// in the event subject (sometimes with a contact name or " with <staff>"
-// appended), so this matches by substring rather than exact equality.
-// The Email Marketing page's real subject is "15-minute HTQ Discovery"
-// (confirmed from the live Make scenario's filter) — matched on both
-// "15-minute" and "discovery" rather than the exact phrase, since Bookings
-// event subjects aren't guaranteed to keep that exact word order.
-const SUBJECT_SOURCE_PATTERNS: { keywords: RegExp[]; source: string }[] = [
-  { keywords: [/15-minute/i, /discovery/i], source: "email_marketing" },
-  { keywords: [/Happen Media/i], source: "happen_media" },
-  { keywords: [/HTQ Website/i], source: "website" },
-  { keywords: [/HTQ LinkedIn/i], source: "linkedin" },
-];
+// Website, LinkedIn) share the same "Service name" ("15-minute HTQ
+// Discovery"), so the calendar event's subject is IDENTICAL no matter
+// which page was used — confirmed live on 2026-10-27: a booking made
+// through the HTQ LinkedIn page still came through with subject
+// "15-minute HTQ Discovery - <name>". Subject can't distinguish them.
+// What's actually different is the event's organizer — each Bookings page
+// is its own Microsoft 365 "booking business" with its own mailbox, which
+// Graph surfaces as organizer.emailAddress.address (e.g.
+// HTQLinkedIn@HometownQuotes.onmicrosoft.com). The Make HTTP module needs
+// {{2.organizer.emailAddress.address}} mapped into a bookingOrganizerEmail
+// field for this to work — see the webhook's own comment below if that
+// field is ever missing.
+const ORGANIZER_EMAIL_SOURCES: Record<string, string> = {
+  "htqdiscoverycall@hometownquotes.onmicrosoft.com": "email_marketing",
+  "hometownquoteshappenmedia@hometownquotes.onmicrosoft.com": "happen_media",
+  "hometownquoteswebsite@hometownquotes.onmicrosoft.com": "website",
+  "htqlinkedin@hometownquotes.onmicrosoft.com": "linkedin",
+};
 
-function sourceFromEventSubject(eventSubject: unknown): string | null {
-  if (typeof eventSubject !== "string") return null;
-  return (
-    SUBJECT_SOURCE_PATTERNS.find((p) => p.keywords.every((k) => k.test(eventSubject)))?.source ?? null
-  );
+function sourceFromOrganizerEmail(organizerEmail: unknown): string | null {
+  if (typeof organizerEmail !== "string") return null;
+  return ORGANIZER_EMAIL_SOURCES[organizerEmail.trim().toLowerCase()] ?? null;
 }
 
 export async function POST(req: Request) {
@@ -60,12 +61,15 @@ export async function POST(req: Request) {
     const eventSubject = body.eventSubject ?? body.subject ?? null;
     const scheduledAt = body.scheduledAt ?? body.startDateTime ?? body.start ?? null;
     // An explicit source (if ever sent) wins. Otherwise, which of the four
-    // Bookings pages this came from — identified by the event subject — is
-    // the more specific signal; the "How are you booking?" custom-question
-    // answer (self-booked vs. called in) is a fallback for events that
-    // don't match a known subject.
+    // Bookings pages this came from — identified by the event's organizer
+    // mailbox — is the more specific signal; the "How are you booking?"
+    // custom-question answer (self-booked vs. called in) is a fallback for
+    // events sent before bookingOrganizerEmail was wired up in Make, or
+    // that otherwise don't match a known organizer.
     const source =
-      body.source || sourceFromEventSubject(eventSubject) || sourceFromEventBody(body.eventBody);
+      body.source ||
+      sourceFromOrganizerEmail(body.bookingOrganizerEmail) ||
+      sourceFromEventBody(body.eventBody);
 
     const supabase = supabaseServer();
     const { error } = await supabase.from("booked_calls").upsert(
