@@ -1,9 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LinkedInPost, LinkedInPostStatus } from "@/lib/data";
 import { LINKEDIN_ACCOUNTS } from "@/lib/data";
+
+type LinkedInPostComment = {
+  id: number;
+  linkedin_post_id: number;
+  author: string;
+  comment: string;
+  resolved: boolean;
+  created_at: string;
+};
 
 const STATUS_OPTIONS: { value: LinkedInPostStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
@@ -50,6 +59,69 @@ export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
   const [editingImage, setEditingImage] = useState(false);
   const [imageTitle, setImageTitle] = useState(post.content.split("\n").find((l) => l.trim())?.trim() ?? "");
   const [imageAbout, setImageAbout] = useState("For agents. By agents.");
+  const [comments, setComments] = useState<LinkedInPostComment[] | null>(null);
+  const [newComment, setNewComment] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
+
+  async function loadComments() {
+    try {
+      const res = await fetch(`/api/linkedin-posts/${post.id}/comments`);
+      const data = await res.json();
+      if (res.ok && data.ok) setComments(data.comments);
+    } catch {
+      // Comments are supplementary — leave the panel silently empty on failure.
+    }
+  }
+
+  // Loaded on mount (not gated on expand) so the open-comment-count badge
+  // is visible on the collapsed row too — that's the whole point, so Paula
+  // can see there's feedback waiting without opening every row.
+  useEffect(() => {
+    loadComments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleAddComment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    setPosting(true);
+    try {
+      const res = await fetch(`/api/linkedin-posts/${post.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: newComment }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to add comment");
+      setNewComment("");
+      await loadComments();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to add comment");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function handleToggleResolved(commentId: number, resolved: boolean) {
+    setResolvingId(commentId);
+    try {
+      const res = await fetch(`/api/linkedin-posts/${post.id}/comments/${commentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolved }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Failed to update comment");
+      await loadComments();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update comment");
+    } finally {
+      setResolvingId(null);
+    }
+  }
+
+  const openCommentCount = (comments ?? []).filter((c) => !c.resolved).length;
 
   function regenerateBrandedVisual() {
     const params = new URLSearchParams({
@@ -159,6 +231,14 @@ export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
           {STATUS_OPTIONS.find((o) => o.value === post.status)?.label}
         </span>
         <span className="shrink-0 text-xs text-body-gray">{dateLabel}</span>
+        {openCommentCount > 0 && (
+          <span
+            className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-700"
+            title={`${openCommentCount} open comment${openCommentCount === 1 ? "" : "s"}`}
+          >
+            💬 {openCommentCount}
+          </span>
+        )}
         <button onClick={() => setExpanded((v) => !v)} className="shrink-0 text-xs font-semibold text-sky-600">
           {expanded ? "Hide ▲" : "View ▼"}
         </button>
@@ -324,6 +404,55 @@ export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
               <EngagementIcon label="Repost" />
               <EngagementIcon label="Send" />
             </div>
+          </div>
+
+          <div className="mx-auto mt-4 max-w-[552px] rounded-lg border border-black/10 bg-white p-4">
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-body-gray">Feedback</h4>
+            <form onSubmit={handleAddComment} className="mb-3 flex flex-col gap-2">
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="e.g. fix the title, swap the image, shorten the second line"
+                className="min-h-[60px] w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+              />
+              <button
+                type="submit"
+                disabled={posting || !newComment.trim()}
+                className="self-end rounded-full bg-sky-500 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
+              >
+                {posting ? "Posting…" : "Add Comment"}
+              </button>
+            </form>
+
+            {comments === null ? (
+              <p className="text-xs text-body-gray">Loading…</p>
+            ) : comments.length === 0 ? (
+              <p className="text-xs text-body-gray">No feedback yet.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {comments.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`rounded-lg border border-black/5 p-2.5 ${c.resolved ? "bg-mist/30" : "bg-mist/60"}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs font-semibold ${c.resolved ? "text-body-gray" : "text-charcoal"}`}>
+                        {c.author}
+                      </span>
+                      <span className="text-[10px] text-body-gray">{new Date(c.created_at).toLocaleString()}</span>
+                    </div>
+                    <p className={`mt-1 text-sm ${c.resolved ? "text-body-gray" : "text-charcoal"}`}>{c.comment}</p>
+                    <button
+                      onClick={() => handleToggleResolved(c.id, !c.resolved)}
+                      disabled={resolvingId === c.id}
+                      className="mt-1 text-xs font-semibold text-body-gray underline disabled:opacity-50"
+                    >
+                      {resolvingId === c.id ? "Saving…" : c.resolved ? "Reopen" : "Mark Resolved"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
