@@ -98,24 +98,71 @@ export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
     ? new Date(post.scheduledDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "Not scheduled";
 
+  // The bold line shown on this row (and at the top of the LinkedIn mock
+  // below) is just the post's first line of content — this edits that one
+  // line directly instead of requiring "Edit text" and scrolling to it in
+  // the full body.
+  const [editingHeadline, setEditingHeadline] = useState(false);
+  const [headlineDraft, setHeadlineDraft] = useState(headline);
+
+  function saveHeadline() {
+    const lines = post.content.split("\n");
+    const idx = lines.findIndex((l) => l.trim());
+    lines[idx === -1 ? 0 : idx] = headlineDraft;
+    const newContent = lines.join("\n");
+    patch({ content: newContent });
+    setContent(newContent);
+    setEditingHeadline(false);
+  }
+
   return (
     <div className="border-b border-black/5 last:border-0">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-charcoal/5"
-      >
+      <div className="flex w-full items-center gap-3 px-5 py-3 transition-colors hover:bg-charcoal/5">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-green text-[10px] font-bold text-white">
           {initials(post.account)}
         </div>
         <span className="shrink-0 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-700">LinkedIn</span>
-        <span className="min-w-0 flex-1 truncate font-semibold text-charcoal">{headline}</span>
+        {editingHeadline ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <input
+              autoFocus
+              type="text"
+              value={headlineDraft}
+              onChange={(e) => setHeadlineDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveHeadline();
+                if (e.key === "Escape") setEditingHeadline(false);
+              }}
+              className="min-w-0 flex-1 rounded-lg border border-black/10 px-2 py-1 text-sm font-semibold text-charcoal"
+            />
+            <button onClick={saveHeadline} disabled={saving} className="shrink-0 text-xs font-semibold text-sky-600 underline disabled:opacity-50">
+              Save
+            </button>
+            <button onClick={() => setEditingHeadline(false)} className="shrink-0 text-xs font-semibold text-body-gray underline">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setHeadlineDraft(headline);
+              setEditingHeadline(true);
+            }}
+            title="Edit title"
+            className="min-w-0 flex-1 truncate text-left font-semibold text-charcoal underline decoration-dotted decoration-black/20 underline-offset-4 hover:decoration-sky-500"
+          >
+            {headline}
+          </button>
+        )}
         <span className="hidden shrink-0 text-xs text-body-gray sm:inline">{post.account}</span>
         <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[post.status]}`}>
           {STATUS_OPTIONS.find((o) => o.value === post.status)?.label}
         </span>
         <span className="shrink-0 text-xs text-body-gray">{dateLabel}</span>
-        <span className="shrink-0 text-xs font-semibold text-sky-600">{expanded ? "Hide ▲" : "View ▼"}</span>
-      </button>
+        <button onClick={() => setExpanded((v) => !v)} className="shrink-0 text-xs font-semibold text-sky-600">
+          {expanded ? "Hide ▲" : "View ▼"}
+        </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-black/5 bg-charcoal/[0.02] px-5 py-4">
