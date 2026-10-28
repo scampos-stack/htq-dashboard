@@ -47,6 +47,19 @@ export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
   const [zoomed, setZoomed] = useState(false);
   const [imgBroken, setImgBroken] = useState(false);
   const [content, setContent] = useState(post.content);
+  const [editingImage, setEditingImage] = useState(false);
+  const [imageTitle, setImageTitle] = useState(post.content.split("\n").find((l) => l.trim())?.trim() ?? "");
+  const [imageAbout, setImageAbout] = useState("For agents. By agents.");
+
+  function regenerateBrandedVisual() {
+    const params = new URLSearchParams({
+      text: imageTitle.trim() || "Hometown Quotes",
+      about: imageAbout.trim() || "For agents. By agents.",
+    });
+    patch({ imageUrl: `/api/linkedin-posts/brand-image?${params.toString()}` });
+    setImgBroken(false);
+    setEditingImage(false);
+  }
 
   async function patch(fields: Record<string, unknown>) {
     setSaving(true);
@@ -153,11 +166,46 @@ export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
               <button onClick={() => setEditing((v) => !v)} className="text-xs font-semibold text-sky-600 underline">
                 {editing ? "Cancel" : "Edit text"}
               </button>
+              <button onClick={() => setEditingImage((v) => !v)} className="text-xs font-semibold text-sky-600 underline">
+                {editingImage ? "Cancel" : "Edit image"}
+              </button>
               <button onClick={handleDelete} disabled={saving} className="text-xs font-semibold text-red-600 underline disabled:opacity-50">
                 Delete
               </button>
             </div>
           </div>
+
+          {editingImage && (
+            <div className="mb-3 rounded-lg border border-black/10 bg-white p-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="text-xs font-semibold text-body-gray">
+                  Title (on the card)
+                  <input
+                    type="text"
+                    value={imageTitle}
+                    onChange={(e) => setImageTitle(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-body-gray">
+                  About (small line at the bottom)
+                  <input
+                    type="text"
+                    value={imageAbout}
+                    onChange={(e) => setImageAbout(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+                  />
+                </label>
+              </div>
+              <button
+                onClick={regenerateBrandedVisual}
+                disabled={saving}
+                className="mt-2 rounded-full bg-charcoal px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                Regenerate image
+              </button>
+            </div>
+          )}
 
           {/* LinkedIn post mock — image stays inside the same max-width as the
               text so it reads at post width, not the full card width. */}

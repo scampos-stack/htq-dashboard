@@ -18,6 +18,15 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
   const [feedback, setFeedback] = useState("");
   const [zoomed, setZoomed] = useState(false);
   const [imgBroken, setImgBroken] = useState(false);
+  const [imageTitle, setImageTitle] = useState("");
+  const [imageAbout, setImageAbout] = useState("For agents. By agents.");
+
+  function generateBrandedVisual() {
+    const title = imageTitle.trim() || content.split("\n").find((l) => l.trim())?.trim() || "Hometown Quotes";
+    const params = new URLSearchParams({ text: title, about: imageAbout.trim() || "For agents. By agents." });
+    setImageUrl(`/api/linkedin-posts/brand-image?${params.toString()}`);
+    setImgBroken(false);
+  }
 
   async function handleOpen() {
     setOpen(true);
@@ -31,6 +40,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
       setContent(data.content);
       setImageUrl(data.imageUrl ?? null);
       setImgBroken(false);
+      setImageTitle(data.content.split("\n").find((l: string) => l.trim())?.trim() ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate post");
     } finally {
@@ -199,33 +209,45 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
                 </div>
               </div>
             )}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={imageUrl ?? ""}
-                onChange={(e) => {
-                  setImageUrl(e.target.value || null);
-                  setImgBroken(false);
-                }}
-                placeholder="https://… (leave blank to post without an image)"
-                className="flex-1 rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const headline = content.split("\n").find((l) => l.trim())?.trim() ?? "Hometown Quotes";
-                  setImageUrl(`/api/linkedin-posts/brand-image?text=${encodeURIComponent(headline)}`);
-                  setImgBroken(false);
-                }}
-                className="shrink-0 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
-              >
-                Generate branded visual
-              </button>
+            <input
+              type="text"
+              value={imageUrl ?? ""}
+              onChange={(e) => {
+                setImageUrl(e.target.value || null);
+                setImgBroken(false);
+              }}
+              placeholder="https://… (leave blank to post without an image, or paste your own)"
+              className="w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+            />
+
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-body-gray">
+                Title (on the card)
+                <input
+                  type="text"
+                  value={imageTitle}
+                  onChange={(e) => setImageTitle(e.target.value)}
+                  placeholder="Defaults to the post's first line"
+                  className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+                />
+              </label>
+              <label className="text-xs font-semibold text-body-gray">
+                About (small line at the bottom)
+                <input
+                  type="text"
+                  value={imageAbout}
+                  onChange={(e) => setImageAbout(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+                />
+              </label>
             </div>
-            <p className="mt-1 text-[11px] text-body-gray">
-              The generated card uses the post's first line as the headline — edit the post text above
-              first if you want different wording on it, then regenerate.
-            </p>
+            <button
+              type="button"
+              onClick={generateBrandedVisual}
+              className="mt-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-charcoal shadow-sm hover:bg-charcoal/5"
+            >
+              Generate branded visual
+            </button>
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

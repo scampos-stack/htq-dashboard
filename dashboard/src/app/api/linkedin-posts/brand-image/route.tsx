@@ -7,6 +7,7 @@ import { ImageResponse } from "next/og";
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const text = (searchParams.get("text") ?? "Hometown Quotes").slice(0, 160);
+  const about = (searchParams.get("about") ?? "For agents. By agents.").slice(0, 80);
   const fontSize = text.length > 110 ? 40 : text.length > 70 ? 46 : 54;
 
   return new ImageResponse(
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", width: "100%", height: 1, backgroundColor: "#DDE3D6", marginBottom: 20 }} />
             <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: 2, color: "#5B5F5C", textTransform: "uppercase" }}>
-              For agents. By agents.
+              {about}
             </span>
           </div>
         </div>
