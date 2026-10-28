@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { LinkedInPost, LinkedInPostStatus } from "@/lib/data";
 import { LINKEDIN_ACCOUNTS } from "@/lib/data";
+import { LinkedInPostAssigneeSelect } from "@/components/LinkedInPostAssigneeSelect";
 
 type LinkedInPostComment = {
   id: number;
@@ -223,6 +224,7 @@ export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
           </button>
         )}
         <span className="hidden shrink-0 text-xs text-body-gray sm:inline">{post.account}</span>
+        <LinkedInPostAssigneeSelect postId={post.id} assignedTo={post.assignedTo} />
         <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[post.status]}`}>
           {STATUS_OPTIONS.find((o) => o.value === post.status)?.label}
         </span>

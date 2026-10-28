@@ -575,13 +575,14 @@ export type LinkedInPost = {
   imageUrl: string | null;
   account: string;
   status: LinkedInPostStatus;
+  assignedTo: string | null;
   scheduledDate: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 const LINKEDIN_POST_COLUMNS =
-  "id, broadcast_draft_id, title, content, image_url, account, status, scheduled_date, created_at, updated_at";
+  "id, broadcast_draft_id, title, content, image_url, account, status, assigned_to, scheduled_date, created_at, updated_at";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapLinkedInPostRow(r: any): LinkedInPost {
@@ -593,6 +594,7 @@ function mapLinkedInPostRow(r: any): LinkedInPost {
     imageUrl: r.image_url ?? null,
     account: r.account,
     status: r.status,
+    assignedTo: r.assigned_to ?? null,
     scheduledDate: r.scheduled_date ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,

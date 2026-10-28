@@ -872,8 +872,12 @@ export async function generateLinkedInPostFromDraft(
       "clickable buttons, so phrase it as a sentence, e.g. \"Link in the " +
       "comments\" or a plain URL if the email's ctaUrl is safe to share " +
       "publicly — use that exact URL verbatim, never invent or alter it). " +
-      "No markdown formatting, no hashtag spam (3 relevant hashtags at the " +
-      "end, maximum, only if they're genuinely relevant).\n\n" +
+      "No markdown formatting, no hashtag spam. Always end with #HometownQuotes " +
+      "and #HometownUniversity (our branding tags) plus, if genuinely relevant " +
+      "to this specific post, one more topical tag like #InsuranceAgents, " +
+      "#InsuranceLeads, #AgencyGrowth, or #LeadGeneration — three hashtags " +
+      "maximum, and skip generic B2B/SaaS jargon tags like #Insurtech that an " +
+      "insurance agent wouldn't actually search.\n\n" +
       "Never open with a standalone title/headline line that just restates " +
       "the campaign or email name (e.g. a lone \"Exclusive Calls\" line " +
       "before the body) — LinkedIn already shows the account name above the " +
