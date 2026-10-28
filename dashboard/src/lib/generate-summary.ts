@@ -874,6 +874,14 @@ export async function generateLinkedInPostFromDraft(
       "publicly — use that exact URL verbatim, never invent or alter it). " +
       "No markdown formatting, no hashtag spam (3 relevant hashtags at the " +
       "end, maximum, only if they're genuinely relevant).\n\n" +
+      "Never open with a standalone title/headline line that just restates " +
+      "the campaign or email name (e.g. a lone \"Exclusive Calls\" line " +
+      "before the body) — LinkedIn already shows the account name above the " +
+      "post, so start directly with the hook sentence instead.\n\n" +
+      "When the source content has a list of discrete tips, steps, or " +
+      "takeaways (not just flowing prose), format each one as its own line " +
+      "starting with \"• \" — real bullets, not a numbered or dashed list — " +
+      "so it's scannable instead of a wall of text.\n\n" +
       (revision
         ? "You are revising a post you already wrote, based on human " +
           "feedback — keep what the feedback doesn't ask to change, and " +
