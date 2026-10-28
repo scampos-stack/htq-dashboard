@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       .from("linkedin_posts")
       .insert({
         broadcast_draft_id: body.broadcastDraftId ?? null,
+        title: typeof body.title === "string" && body.title.trim() ? body.title.trim() : null,
         content: content.trim(),
         image_url: body.imageUrl || null,
         account,

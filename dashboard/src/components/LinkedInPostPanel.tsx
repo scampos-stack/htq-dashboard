@@ -12,6 +12,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [content, setContent] = useState("");
+  const [postTitle, setPostTitle] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [account, setAccount] = useState<string>(LINKEDIN_ACCOUNTS[2]);
   const [scheduledDate, setScheduledDate] = useState("");
@@ -40,7 +41,9 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
       setContent(data.content);
       setImageUrl(data.imageUrl ?? null);
       setImgBroken(false);
-      setImageTitle(data.content.split("\n").find((l: string) => l.trim())?.trim() ?? "");
+      const firstLine = data.content.split("\n").find((l: string) => l.trim())?.trim() ?? "";
+      setImageTitle(firstLine);
+      setPostTitle(firstLine);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate post");
     } finally {
@@ -88,6 +91,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           broadcastDraftId: draftId,
+          title: postTitle,
           content,
           imageUrl,
           account,
@@ -140,6 +144,16 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
         </p>
       ) : (
         <>
+          <label className="mb-2 block text-xs font-semibold text-body-gray">
+            Title — just for the agenda/queue, not part of the post itself
+            <input
+              type="text"
+              value={postTitle}
+              onChange={(e) => setPostTitle(e.target.value)}
+              placeholder="e.g. Exclusive Calls launch"
+              className="mt-1 w-full rounded-lg border border-black/10 px-3 py-2 text-sm text-charcoal"
+            />
+          </label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -222,7 +236,7 @@ export function LinkedInPostPanel({ draftId }: { draftId: number }) {
 
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="text-xs font-semibold text-body-gray">
-                Title (on the card)
+                Image headline (text shown on the branded card itself)
                 <input
                   type="text"
                   value={imageTitle}

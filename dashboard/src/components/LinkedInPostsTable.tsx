@@ -165,25 +165,21 @@ export function LinkedInPostRow({ post }: { post: LinkedInPost }) {
     }
   }
 
-  const headline = post.content.split("\n").find((l) => l.trim()) ?? post.content;
+  // The internal label shown on this row is its own field, separate from
+  // the post body — editing it used to rewrite the post's first line, which
+  // meant "what is this post about" and "what the post actually opens with"
+  // couldn't be different things. Falls back to the first line only for
+  // posts saved before the title column existed.
+  const headline = post.title?.trim() || post.content.split("\n").find((l) => l.trim()) || post.content;
   const dateLabel = post.scheduledDate
     ? new Date(post.scheduledDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "Not scheduled";
 
-  // The bold line shown on this row (and at the top of the LinkedIn mock
-  // below) is just the post's first line of content — this edits that one
-  // line directly instead of requiring "Edit text" and scrolling to it in
-  // the full body.
   const [editingHeadline, setEditingHeadline] = useState(false);
   const [headlineDraft, setHeadlineDraft] = useState(headline);
 
   function saveHeadline() {
-    const lines = post.content.split("\n");
-    const idx = lines.findIndex((l) => l.trim());
-    lines[idx === -1 ? 0 : idx] = headlineDraft;
-    const newContent = lines.join("\n");
-    patch({ content: newContent });
-    setContent(newContent);
+    patch({ title: headlineDraft });
     setEditingHeadline(false);
   }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
 const EDITABLE_FIELDS: Record<string, string> = {
+  title: "title",
   content: "content",
   imageUrl: "image_url",
   account: "account",

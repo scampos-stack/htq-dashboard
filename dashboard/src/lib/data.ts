@@ -570,6 +570,7 @@ export type LinkedInPostStatus = "draft" | "approved" | "scheduled" | "published
 export type LinkedInPost = {
   id: number;
   broadcastDraftId: number | null;
+  title: string | null;
   content: string;
   imageUrl: string | null;
   account: string;
@@ -580,13 +581,14 @@ export type LinkedInPost = {
 };
 
 const LINKEDIN_POST_COLUMNS =
-  "id, broadcast_draft_id, content, image_url, account, status, scheduled_date, created_at, updated_at";
+  "id, broadcast_draft_id, title, content, image_url, account, status, scheduled_date, created_at, updated_at";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapLinkedInPostRow(r: any): LinkedInPost {
   return {
     id: r.id,
     broadcastDraftId: r.broadcast_draft_id ?? null,
+    title: r.title ?? null,
     content: r.content,
     imageUrl: r.image_url ?? null,
     account: r.account,
